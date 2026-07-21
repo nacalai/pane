@@ -18,7 +18,7 @@ app.disableHardwareAcceleration()
 app.commandLine.appendSwitch('force-device-scale-factor', '1')
 
 const SELFCHECK = process.env.VEV_SELFCHECK === '1'
-const SELFCHECK_MS = 20_000
+const SELFCHECK_MS = Number(process.env.VEV_SELFCHECK_MS) > 0 ? Number(process.env.VEV_SELFCHECK_MS) : 20_000
 const SELFCHECK_CRASH_AT_MS = 8_000
 const SELFCHECK_MIN_FRAMES = 300
 
