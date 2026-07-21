@@ -9,7 +9,10 @@
  */
 import { existsSync } from 'node:fs'
 import { join, dirname, delimiter } from 'node:path'
-import koffi from 'koffi'
+import koffi, { type TypeObject } from 'koffi'
+
+/** koffi 3 dropped the KoffiFunction type; native calls take/return unknown. */
+type NativeFn = (...args: unknown[]) => unknown
 
 /** 'B','G','R','A' little-endian. */
 export const FOURCC_BGRA = 0x41524742
@@ -34,8 +37,8 @@ function dllCandidates(): string[] {
 }
 
 export class NdiSender {
-  private fns: Record<string, koffi.KoffiFunction> | null = null
-  private types: Record<string, koffi.IKoffiCType> = {}
+  private fns: Record<string, NativeFn> | null = null
+  private types: Record<string, TypeObject> = {}
   private send: unknown = null
   private find: unknown = null
   private senderName = ''
