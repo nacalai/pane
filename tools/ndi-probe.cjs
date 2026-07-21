@@ -156,13 +156,15 @@ async function main() {
     }
   }
 
+  const fourccName = (n) =>
+    n == null ? null : String.fromCharCode(n & 255, (n >> 8) & 255, (n >> 16) & 255, (n >> 24) & 255);
   const activeSecs = firstFrameAt ? (Date.now() - firstFrameAt) / 1000 : SECONDS;
   const result = {
     ok: frames > 0,
     source: sourceName,
     frames,
     fps: frames > 0 ? Math.round((frames / activeSecs) * 10) / 10 : 0,
-    video: last,
+    video: last ? { ...last, fourCCName: fourccName(last.fourCC) } : null,
     pixels: lastPixels
   };
   console.log(JSON.stringify(result, null, 2));

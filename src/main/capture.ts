@@ -330,7 +330,9 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
         if (!this.latest || !this.sender.isLive()) return
         const decision = this.pacer.onTick(now)
         if (decision.send) {
-          this.sender.sendFrame(this.latest, this.cfg.width, this.cfg.height, FPS_N[this.cfg.fps], 1000)
+          // Opaque (BGRX) unless the user wants alpha out — cleaner + lighter on the wire.
+          const opaque = !this.cfg.transparent
+          this.sender.sendFrame(this.latest, this.cfg.width, this.cfg.height, FPS_N[this.cfg.fps], 1000, opaque)
         }
       } catch (e) {
         // One bad tick must not kill the loop or the process — the next tick recovers.

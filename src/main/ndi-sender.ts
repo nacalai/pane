@@ -14,8 +14,10 @@ import koffi, { type TypeObject } from 'koffi'
 /** koffi 3 dropped the KoffiFunction type; native calls take/return unknown. */
 type NativeFn = (...args: unknown[]) => unknown
 
-/** 'B','G','R','A' little-endian. */
+/** 'B','G','R','A' little-endian — used only when the page has real transparency. */
 export const FOURCC_BGRA = 0x41524742
+/** 'B','G','R','X' — opaque: NDI skips the alpha plane (cleaner + lighter). Default. */
+export const FOURCC_BGRX = 0x58524742
 const FRAME_FORMAT_PROGRESSIVE = 1
 /** NDIlib_send_timecode_synthesize (INT64_MAX): SDK stamps UTC timecodes for us. */
 const TIMECODE_SYNTHESIZE = 0x7fffffffffffffffn
@@ -43,6 +45,7 @@ export class NdiSender {
   private find: unknown = null
   private senderName = ''
   private warnedBadFrame = false
+  private loggedFourcc = false
 
   /** Load DLL + NDIlib_initialize + a find instance. Call once; safe to call again after failure. */
   init(): NdiInitResult {
@@ -157,8 +160,12 @@ export class NdiSender {
     return this.send !== null
   }
 
-  /** Push one BGRA frame. Returns false (and logs once) on a size mismatch instead of corrupting. */
-  sendFrame(bgra: Buffer, w: number, h: number, fpsN: number, fpsD: number): boolean {
+  /**
+   * Push one 32-bit little-endian frame. `opaque` picks BGRX (no alpha plane — NDI's
+   * cleaner, lighter opaque SpeedHQ path) vs BGRA when the page has real transparency.
+   * Returns false (and logs once) on a size mismatch instead of corrupting.
+   */
+  sendFrame(bgra: Buffer, w: number, h: number, fpsN: number, fpsD: number, opaque: boolean): boolean {
     if (!this.fns || !this.send) return false
     if (bgra.byteLength !== w * h * 4) {
       if (!this.warnedBadFrame) {
@@ -167,10 +174,14 @@ export class NdiSender {
       }
       return false
     }
+    if (!this.loggedFourcc) {
+      this.loggedFourcc = true
+      console.log(`[ndi] sender FourCC = ${opaque ? 'BGRX (opaque)' : 'BGRA (alpha)'}`)
+    }
     this.fns.send_video!(this.send, {
       xres: w,
       yres: h,
-      FourCC: FOURCC_BGRA,
+      FourCC: opaque ? FOURCC_BGRX : FOURCC_BGRA,
       frame_rate_N: fpsN,
       frame_rate_D: fpsD,
       picture_aspect_ratio: w / h,
