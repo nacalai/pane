@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Fps, VevState } from '@shared/schema'
+import type { Fps, PaneState } from '@shared/schema'
 
 const PRESETS: Array<{ label: string; w: number; h: number }> = [
   { label: '1920 × 1080', w: 1920, h: 1080 },
@@ -8,7 +8,7 @@ const PRESETS: Array<{ label: string; w: number; h: number }> = [
 ]
 const FPS_OPTIONS: Fps[] = [25, 30, 50, 60]
 
-export function SettingsRail({ state }: { state: VevState }): React.JSX.Element {
+export function SettingsRail({ state }: { state: PaneState }): React.JSX.Element {
   const { config } = state
   const [customW, setCustomW] = useState(String(config.width))
   const [customH, setCustomH] = useState(String(config.height))
@@ -17,7 +17,7 @@ export function SettingsRail({ state }: { state: VevState }): React.JSX.Element 
 
   const apply = (patch: Record<string, unknown>): void => {
     setError(null)
-    void window.vev.setSettings(patch).then((r) => {
+    void window.pane.setSettings(patch).then((r) => {
       if (!r.ok) setError(r.error)
     })
   }
@@ -61,7 +61,7 @@ export function SettingsRail({ state }: { state: VevState }): React.JSX.Element 
         <button
           className={`btn btn--big ${live ? 'btn--stop' : 'btn--primary'}`}
           disabled={state.ndi === 'no-runtime'}
-          onClick={() => void (live ? window.vev.stop() : window.vev.start())}
+          onClick={() => void (live ? window.pane.stop() : window.pane.start())}
         >
           {live ? 'STOP NDI' : 'START NDI'}
         </button>

@@ -1,12 +1,12 @@
 /**
- * VevApp — coordinator that owns NDI status + capture + config and assembles
- * the single VevState pushed to the control UI. All mutations funnel through
+ * PaneApp — coordinator that owns NDI status + capture + config and assembles
+ * the single PaneState pushed to the control UI. All mutations funnel through
  * here so state can never fork between main and renderer.
  */
 import { powerSaveBlocker, type BrowserWindow } from 'electron'
 import type { ConfigStore } from './config'
 import { NdiSender } from './ndi-sender'
-import { VevCapture, type CaptureStats } from './capture'
+import { PaneCapture, type CaptureStats } from './capture'
 import { ControlServer } from './control-server'
 import type { ControlCommand } from '@shared/control-routes'
 import {
@@ -15,19 +15,19 @@ import {
   type IpcResult,
   type NdiStatus,
   type SettingsPatch,
-  type VevConfig,
-  type VevState
+  type PaneConfig,
+  type PaneState
 } from '@shared/schema'
 
-export class VevApp {
+export class PaneApp {
   readonly sender = new NdiSender()
-  readonly capture: VevCapture
+  readonly capture: PaneCapture
   private ndiStatus: NdiStatus = 'off'
   private ndiError: string | null = null
   private ndiVersion: string | null = null
   private runtimeOk = false
   private lastStats: CaptureStats = { sentFps: 0, framesSent: 0, staticPage: true, receivers: 0 }
-  private config: VevConfig
+  private config: PaneConfig
   private control: BrowserWindow | null = null
   private psbId: number | null = null
   private downThis = false
@@ -47,7 +47,7 @@ export class VevApp {
     resourcesDir: string
   ) {
     this.config = store.load()
-    this.capture = new VevCapture(this.sender, resourcesDir, this.config)
+    this.capture = new PaneCapture(this.sender, resourcesDir, this.config)
     this.capture.on('nav', () => this.pushState())
     this.capture.on('stats', (s) => {
       this.lastStats = s
@@ -82,7 +82,7 @@ export class VevApp {
         return r.ok ? { ok: true, data: null } : r
       }
       case 'testcard': {
-        const r = this.navigate('vev:testcard')
+        const r = this.navigate('pane:testcard')
         return r.ok ? { ok: true, data: null } : r
       }
       case 'key':
@@ -149,10 +149,10 @@ export class VevApp {
   attachControl(win: BrowserWindow): void {
     this.control = win
     this.capture.on('preview', (buf, mime) => {
-      if (!win.isDestroyed()) win.webContents.send('vev:preview', buf, mime)
+      if (!win.isDestroyed()) win.webContents.send('pane:preview', buf, mime)
     })
     this.capture.on('cursor', (cursor) => {
-      if (!win.isDestroyed()) win.webContents.send('vev:cursor', cursor)
+      if (!win.isDestroyed()) win.webContents.send('pane:cursor', cursor)
     })
   }
 
@@ -194,15 +194,15 @@ export class VevApp {
     return { ok: true, data: null }
   }
 
-  private loginItemHandler: ((cfg: VevConfig) => void) | null = null
+  private loginItemHandler: ((cfg: PaneConfig) => void) | null = null
 
   /** index.ts registers this to sync the OS login item (packaged-only). */
-  onLoginItemChange(cb: (cfg: VevConfig) => void): void {
+  onLoginItemChange(cb: (cfg: PaneConfig) => void): void {
     this.loginItemHandler = cb
   }
 
   applySettings(patch: SettingsPatch): IpcResult {
-    const next: VevConfig = { ...this.config, ...patch }
+    const next: PaneConfig = { ...this.config, ...patch }
     next.ndiName = sanitizeNdiName(next.ndiName)
     const prevName = this.config.ndiName
     const httpChanged =
@@ -238,7 +238,7 @@ export class VevApp {
     return { ok: true, data: null }
   }
 
-  state(): VevState {
+  state(): PaneState {
     return {
       ndi: this.ndiStatus,
       ndiError: this.ndiError,
@@ -257,7 +257,7 @@ export class VevApp {
 
   pushState(): void {
     if (this.control && !this.control.isDestroyed()) {
-      this.control.webContents.send('vev:state', this.state())
+      this.control.webContents.send('pane:state', this.state())
     }
   }
 

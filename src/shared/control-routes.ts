@@ -1,9 +1,9 @@
 /**
  * Pure HTTP-route parsing for the Stream Deck / Companion control API.
  * No node/electron imports — fully unit-testable. The server maps the
- * returned command onto VevApp; this file only validates and shapes input.
+ * returned command onto PaneApp; this file only validates and shapes input.
  */
-import type { InputModifier, NavAction, VevMode } from './schema'
+import type { InputModifier, NavAction, PaneMode } from './schema'
 
 export type ControlCommand =
   | { kind: 'status' }
@@ -14,7 +14,7 @@ export type ControlCommand =
   | { kind: 'click'; x: number; y: number; button: 0 | 1 | 2 }
   | { kind: 'testcard' }
   | { kind: 'ndi'; on: boolean }
-  | { kind: 'mode'; mode: VevMode; fullscreen?: boolean; displayId?: number }
+  | { kind: 'mode'; mode: PaneMode; fullscreen?: boolean; displayId?: number }
 
 export type RouteResult =
   | { ok: true; cmd: ControlCommand }

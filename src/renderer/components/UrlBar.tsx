@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import type { VevState } from '@shared/schema'
+import type { PaneState } from '@shared/schema'
 
-export function UrlBar({ state }: { state: VevState }): React.JSX.Element {
+export function UrlBar({ state }: { state: PaneState }): React.JSX.Element {
   const [value, setValue] = useState(state.nav.url)
   const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -16,7 +16,7 @@ export function UrlBar({ state }: { state: VevState }): React.JSX.Element {
     const url = target ?? value
     if (!url.trim()) return
     setError(null)
-    void window.vev.navigate(url).then((r) => {
+    void window.pane.navigate(url).then((r) => {
       if (!r.ok) setError(r.error)
       else {
         editingRef.current = false
@@ -27,7 +27,7 @@ export function UrlBar({ state }: { state: VevState }): React.JSX.Element {
 
   const act = (action: 'back' | 'forward' | 'reload'): void => {
     setError(null)
-    void window.vev.navAction(action)
+    void window.pane.navAction(action)
   }
 
   return (
@@ -78,7 +78,7 @@ export function UrlBar({ state }: { state: VevState }): React.JSX.Element {
         <button className="btn btn--primary" onClick={() => go()}>
           Go
         </button>
-        <button className="btn btn--ghost" title="VEV test card" onClick={() => go('vev:testcard')}>
+        <button className="btn btn--ghost" title="Pane test card" onClick={() => go('pane:testcard')}>
           Test card
         </button>
       </div>

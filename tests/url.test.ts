@@ -15,7 +15,7 @@ describe('normalizeUrl', () => {
   })
 
   it('accepts the internal testcard id (both spellings)', () => {
-    expect(normalizeUrl('vev:testcard')).toEqual({ ok: true, url: INTERNAL_TESTCARD })
+    expect(normalizeUrl('pane:testcard')).toEqual({ ok: true, url: INTERNAL_TESTCARD })
     expect(normalizeUrl('Testkort')).toEqual({ ok: true, url: INTERNAL_TESTCARD })
   })
 

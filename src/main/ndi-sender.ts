@@ -1,6 +1,6 @@
 /**
  * Real NDI output via koffi FFI into Processing.NDI.Lib.x64.dll — no native compilation.
- * Adapted from creavid-gjest (proven on this machine, NDI 6.3.x runtime). VEV sends BGRA:
+ * Adapted from creavid-gjest (proven on this machine, NDI 6.3.x runtime). Pane sends BGRA:
  * Electron's offscreen paint hands us BGRA bitmaps, and BGRA is a first-class NDI FourCC,
  * so frames pass through with zero pixel conversion. Alpha is premultiplied on both sides.
  *
@@ -127,7 +127,7 @@ export class NdiSender {
     }
   }
 
-  /** Publish the named sender. clock_video=false: VEV paces frames itself. */
+  /** Publish the named sender. clock_video=false: Pane paces frames itself. */
   createSender(name: string): NdiResult {
     if (!this.fns) return { ok: false, error: 'NDI runtime is not loaded' }
     if (this.send && this.senderName === name) return { ok: true }
@@ -211,7 +211,7 @@ export class NdiSender {
     }
   }
 
-  /** Current NDI source names on the network (self-check that "… (VEV)" is visible). */
+  /** Current NDI source names on the network (self-check that "… (Pane)" is visible). */
   findSources(): string[] {
     if (!this.fns || !this.find) return []
     try {

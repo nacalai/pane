@@ -1,6 +1,6 @@
-import type { VevState } from '@shared/schema'
+import type { PaneState } from '@shared/schema'
 
-export function StatsStrip({ state }: { state: VevState }): React.JSX.Element {
+export function StatsStrip({ state }: { state: PaneState }): React.JSX.Element {
   const { config } = state
   return (
     <footer className="stats">

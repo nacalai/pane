@@ -26,7 +26,7 @@ describe('authorizeRequest — loopback', () => {
   })
 
   it('rejects browser-scripted requests — the on-air CSRF vector', () => {
-    // fetch()/img/script from any web page, including VEV's own content window
+    // fetch()/img/script from any web page, including Pane's own content window
     expect(authorizeRequest({ ...base, secFetchSite: 'cross-site' }).ok).toBe(false)
     expect(authorizeRequest({ ...base, secFetchSite: 'same-site' }).ok).toBe(false)
     expect(authorizeRequest({ ...base, secFetchSite: 'same-origin' }).ok).toBe(false)

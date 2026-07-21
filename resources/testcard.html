@@ -2,7 +2,7 @@
 <html lang="no">
 <head>
 <meta charset="utf-8">
-<title>VEV test card</title>
+<title>Pane test card</title>
 <style>
   /* Self-contained — no network. VAPOR-flavoured broadcast testcard. */
   :root {
@@ -54,7 +54,7 @@
   .ramp { display: flex; height: 5vh; border: 1px solid rgba(255,255,255,.25); border-top: 0; }
   .ramp div { flex: 1; }
 
-  /* Dithered smooth gradient — proves VEV carries a clean gradient when the source is
+  /* Dithered smooth gradient — proves Pane carries a clean gradient when the source is
      dithered. Undithered 8-bit gradients band through NDI's 4:2:2; this one does not. */
   .gradbar { display: block; width: 100%; height: 5vh; border: 1px solid rgba(255,255,255,.25); border-top: 0; }
 
@@ -84,7 +84,7 @@
   <div class="corner bl"></div><div class="corner br"></div>
 
   <header>
-    <div class="wordmark">VEV<span class="accent">.</span></div>
+    <div class="wordmark">Pane<span class="accent">.</span></div>
     <div class="brand">Creavid · webpage → NDI</div>
   </header>
 
@@ -112,7 +112,7 @@
 
   <footer>
     <span><b id="res">–</b> @ <b id="fps">–</b> fps</span>
-    <span class="pill" id="ndi">NDI · VEV</span>
+    <span class="pill" id="ndi">NDI · Pane</span>
   </footer>
 
 <script>
@@ -150,14 +150,14 @@
     ctx.putImageData(img, 0, 0);
   })();
 
-  // Params injected by VEV (w, h, fps, name)
+  // Params injected by Pane (w, h, fps, name)
   (function () {
     var q = new URLSearchParams(location.search);
     var w = q.get('w') || String(screen.width);
     var h = q.get('h') || String(screen.height);
     document.getElementById('res').textContent = w + '×' + h;
     document.getElementById('fps').textContent = q.get('fps') || '?';
-    document.getElementById('ndi').textContent = 'NDI · ' + (q.get('name') || 'VEV');
+    document.getElementById('ndi').textContent = 'NDI · ' + (q.get('name') || 'Pane');
   })();
 
   // Clock with tenths — continuous motion proves live frames end-to-end.

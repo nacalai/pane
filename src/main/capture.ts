@@ -1,5 +1,5 @@
 /**
- * VevCapture — the engine. Owns the content window and everything that happens
+ * PaneCapture — the engine. Owns the content window and everything that happens
  * to its pixels, in one of two modes sharing the same downstream pipeline:
  *
  *   studio    — hidden OFFSCREEN window; 'paint' events deliver BGRA NativeImages.
@@ -20,9 +20,9 @@ import { mapInput } from './input-map'
 import { Pacer } from './pacer'
 import type { NdiSender } from './ndi-sender'
 import { INTERNAL_TESTCARD, normalizeUrl } from '@shared/url'
-import type { Fps, InputEventReq, NavAction, NavState, VevConfig } from '@shared/schema'
+import type { Fps, InputEventReq, NavAction, NavState, PaneConfig } from '@shared/schema'
 
-const PARTITION = 'persist:vev-content'
+const PARTITION = 'persist:pane-content'
 const PREVIEW_INTERVAL_MS = 100
 const PREVIEW_WIDTH = 640
 const PREVIEW_JPEG_QUALITY = 65
@@ -70,9 +70,9 @@ interface CaptureEvents {
   presenterClosed: []
 }
 
-export class VevCapture extends EventEmitter<CaptureEvents> {
+export class PaneCapture extends EventEmitter<CaptureEvents> {
   private win: BrowserWindow | null = null
-  private cfg: VevConfig
+  private cfg: PaneConfig
   private latest: Buffer | null = null
   private readonly pacer = new Pacer()
   private sendTimer: NodeJS.Timeout | null = null
@@ -99,7 +99,7 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
   constructor(
     private readonly sender: NdiSender,
     private readonly resourcesDir: string,
-    initialCfg: VevConfig
+    initialCfg: PaneConfig
   ) {
     super()
     this.cfg = { ...initialCfg }
@@ -110,7 +110,7 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
   }
 
   start(): void {
-    if (this.disposed) throw new Error('VevCapture is disposed')
+    if (this.disposed) throw new Error('PaneCapture is disposed')
     if (this.win) return
     this.createWindow()
     this.startLoops()
@@ -124,8 +124,8 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
 
   private createWindow(): void {
     const ses = session.fromPartition(PARTITION)
-    if (!VevCapture.sessionWired) {
-      VevCapture.sessionWired = true
+    if (!PaneCapture.sessionWired) {
+      PaneCapture.sessionWired = true
       // The content window renders arbitrary remote pages: deny every permission
       // prompt AND every silent permission check, and block downloads outright.
       ses.setPermissionRequestHandler((_wc, _permission, callback) => callback(false))
@@ -142,7 +142,7 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
       resizable: false,
       fullscreenable: true,
       autoHideMenuBar: true,
-      title: 'VEV — presenter',
+      title: 'Pane — presenter',
       backgroundColor: presenter ? '#0C1116' : undefined,
       // transparent only exists offscreen; a visible transparent window makes no sense here
       transparent: !presenter && this.cfg.transparent,
@@ -495,7 +495,7 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
   // ---------- settings ----------
 
   /** Apply a new full config. Returns true if the change required a window rebuild. */
-  applyConfig(next: VevConfig): boolean {
+  applyConfig(next: PaneConfig): boolean {
     const prev = this.cfg
     this.cfg = { ...next }
     if (!this.win) return false
@@ -630,7 +630,7 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
     this.tearingWindow = false
   }
 
-  getConfig(): VevConfig {
+  getConfig(): PaneConfig {
     return { ...this.cfg }
   }
 

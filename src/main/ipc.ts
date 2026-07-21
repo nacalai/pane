@@ -3,7 +3,7 @@
  * { ok } | { ok:false, error } unions — nothing ever throws across IPC.
  */
 import { ipcMain } from 'electron'
-import type { VevApp } from './app'
+import type { PaneApp } from './app'
 import {
   InputEventSchema,
   NavActionSchema,
@@ -34,15 +34,15 @@ function guarded<T>(
   }
 }
 
-export function registerIpc(app: VevApp): void {
-  ipcMain.handle('vev:start', () => {
+export function registerIpc(app: PaneApp): void {
+  ipcMain.handle('pane:start', () => {
     try {
       return app.startNdi()
     } catch (e) {
       return { ok: false, error: (e as Error).message }
     }
   })
-  ipcMain.handle('vev:stop', () => {
+  ipcMain.handle('pane:stop', () => {
     try {
       return app.stopNdi()
     } catch (e) {
@@ -50,21 +50,21 @@ export function registerIpc(app: VevApp): void {
     }
   })
   ipcMain.handle(
-    'vev:navigate',
+    'pane:navigate',
     guarded(NavigateReqSchema, (p) => app.navigate(p.url))
   )
   ipcMain.handle(
-    'vev:nav-action',
+    'pane:nav-action',
     guarded(NavActionSchema, (p) => {
       app.capture.navAction(p.action)
       return { ok: true, data: null }
     })
   )
   ipcMain.handle(
-    'vev:settings',
+    'pane:settings',
     guarded(SettingsPatchSchema, (p) => app.applySettings(p))
   )
-  ipcMain.handle('vev:get-state', (): IpcResult<ReturnType<VevApp['state']>> => {
+  ipcMain.handle('pane:get-state', (): IpcResult<ReturnType<PaneApp['state']>> => {
     try {
       return { ok: true, data: app.state() }
     } catch (e) {
@@ -72,7 +72,7 @@ export function registerIpc(app: VevApp): void {
     }
   })
   // High-rate fire-and-forget input; invalid events are dropped silently.
-  ipcMain.on('vev:input', (_event, raw: unknown) => {
+  ipcMain.on('pane:input', (_event, raw: unknown) => {
     const parsed = InputEventSchema.safeParse(raw)
     if (parsed.success) app.capture.injectInput(parsed.data)
   })

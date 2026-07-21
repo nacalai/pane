@@ -93,7 +93,7 @@ export class ControlServer {
         send(405, { ok: false, error: 'GET/POST only' })
         return
       }
-      const url = new URL(req.url ?? '/', 'http://vev.local')
+      const url = new URL(req.url ?? '/', 'http://pane.local')
       const auth = this.authorized(req)
       if (!auth.ok) {
         send(403, { ok: false, error: `not authorized: ${auth.reason}` })

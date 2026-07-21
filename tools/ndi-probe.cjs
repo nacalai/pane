@@ -1,10 +1,10 @@
 'use strict';
 /*
- * ndi-probe.js — independent NDI RECEIVER used to prove VEV's output end-to-end.
+ * ndi-probe.js — independent NDI RECEIVER used to prove Pane's output end-to-end.
  * Finds a source whose name contains the given needle, connects, captures video
  * for N seconds, and reports resolution / fps / pixel samples as JSON.
  *
- *   node tools/ndi-probe.js VEV 10
+ *   node tools/ndi-probe.js Pane 10
  *
  * Exit codes: 0 = frames received and sane, 2 = source not found, 3 = no frames,
  * 1 = unexpected failure.
@@ -14,7 +14,7 @@ const path = require('path');
 const fs = require('fs');
 const koffi = require('koffi');
 
-const NEEDLE = process.argv[2] || 'VEV';
+const NEEDLE = process.argv[2] || 'Pane';
 const SECONDS = Math.max(2, Number(process.argv[3] || 8));
 const FIND_TIMEOUT_MS = 15000;
 

@@ -1,7 +1,7 @@
 /**
  * Pure authorization decision for the control API — separated for unit tests.
  *
- * Threat model: VEV's own content window renders ARBITRARY web pages on this
+ * Threat model: Pane's own content window renders ARBITRARY web pages on this
  * machine. A hostile page can fire fetch()/img/navigation requests at
  * http://127.0.0.1:<port>/api/* — loopback origin, real side effects (hijack
  * what's on air). Defenses:

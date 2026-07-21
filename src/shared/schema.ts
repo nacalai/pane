@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 /** NDI publishes as "<machine> (<name>)" — parens are stripped so the wrapping stays unambiguous. */
 export const NDI_NAME_MAX = 63
-export const DEFAULT_NDI_NAME = 'VEV'
+export const DEFAULT_NDI_NAME = 'Pane'
 
 export function sanitizeNdiName(s: string): string {
   const cleaned = s
@@ -21,9 +21,9 @@ export type Fps = (typeof FPS_VALUES)[number]
  * presenter — visible window (windowed/fullscreen) the presenter uses DIRECTLY;
  *             frames captured from the live window. Same NDI pipeline.
  */
-export type VevMode = 'studio' | 'presenter'
+export type PaneMode = 'studio' | 'presenter'
 
-export interface VevConfig {
+export interface PaneConfig {
   url: string
   ndiName: string
   width: number
@@ -34,7 +34,7 @@ export interface VevConfig {
   autoStart: boolean
   dither: boolean
   showPreview: boolean
-  mode: VevMode
+  mode: PaneMode
   presenterFullscreen: boolean
   presenterDisplayId: number
   httpEnabled: boolean
@@ -47,8 +47,8 @@ export interface VevConfig {
 
 export const DEFAULT_HTTP_PORT = 9350
 
-export const DEFAULT_CONFIG: VevConfig = {
-  url: 'vev:testcard',
+export const DEFAULT_CONFIG: PaneConfig = {
+  url: 'pane:testcard',
   ndiName: DEFAULT_NDI_NAME,
   width: 1920,
   height: 1080,
@@ -98,8 +98,8 @@ export const SettingsPatchSchema = z
   .partial()
 export type SettingsPatch = z.infer<typeof SettingsPatchSchema>
 
-/** Stored/foreign config → VevConfig. Any failure yields defaults — a broken file must never brick the app. */
-export function parseConfig(raw: unknown): VevConfig {
+/** Stored/foreign config → PaneConfig. Any failure yields defaults — a broken file must never brick the app. */
+export function parseConfig(raw: unknown): PaneConfig {
   const res = SettingsPatchSchema.safeParse(raw)
   if (!res.success) return { ...DEFAULT_CONFIG }
   const merged = { ...DEFAULT_CONFIG, ...res.data }
@@ -184,7 +184,7 @@ export interface NavState {
   unresponsive: boolean
 }
 
-export interface VevState {
+export interface PaneState {
   ndi: NdiStatus
   ndiError: string | null
   ndiVersion: string | null
@@ -196,7 +196,7 @@ export interface VevState {
   httpError: string | null
   displays: DisplayInfo[]
   nav: NavState
-  config: VevConfig
+  config: PaneConfig
 }
 
 export type IpcResult<T = null> = { ok: true; data: T } | { ok: false; error: string }

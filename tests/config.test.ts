@@ -7,7 +7,7 @@ import { DEFAULT_CONFIG } from '../src/shared/schema'
 
 let dir: string
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'vev-config-'))
+  dir = mkdtempSync(join(tmpdir(), 'pane-config-'))
 })
 afterEach(() => {
   rmSync(dir, { recursive: true, force: true })
@@ -60,8 +60,8 @@ describe('ConfigStore', () => {
   it('leaves no tmp file behind after save', () => {
     const store = new ConfigStore(dir)
     store.save(DEFAULT_CONFIG)
-    expect(readdirSync(dir)).toEqual(['vev-config.json'])
-    expect(JSON.parse(readFileSync(store.filePath, 'utf8')).url).toBe('vev:testcard')
+    expect(readdirSync(dir)).toEqual(['pane-config.json'])
+    expect(JSON.parse(readFileSync(store.filePath, 'utf8')).url).toBe('pane:testcard')
   })
 
   it('creates the directory if missing and never throws on save failure', () => {

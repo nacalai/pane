@@ -1,5 +1,5 @@
 /**
- * Sandboxed preload — bundled to CJS. Exposes ONLY the named VEV surface;
+ * Sandboxed preload — bundled to CJS. Exposes ONLY the named Pane surface;
  * no generic ipc bridge. Validation happens in main; this file stays dumb.
  */
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
@@ -14,18 +14,18 @@ function subscribe<T extends unknown[]>(
 }
 
 const api = {
-  start: () => ipcRenderer.invoke('vev:start'),
-  stop: () => ipcRenderer.invoke('vev:stop'),
-  navigate: (url: string) => ipcRenderer.invoke('vev:navigate', { url }),
-  navAction: (action: string) => ipcRenderer.invoke('vev:nav-action', { action }),
-  setSettings: (patch: unknown) => ipcRenderer.invoke('vev:settings', patch),
-  getState: () => ipcRenderer.invoke('vev:get-state'),
+  start: () => ipcRenderer.invoke('pane:start'),
+  stop: () => ipcRenderer.invoke('pane:stop'),
+  navigate: (url: string) => ipcRenderer.invoke('pane:navigate', { url }),
+  navAction: (action: string) => ipcRenderer.invoke('pane:nav-action', { action }),
+  setSettings: (patch: unknown) => ipcRenderer.invoke('pane:settings', patch),
+  getState: () => ipcRenderer.invoke('pane:get-state'),
   sendInput: (ev: unknown) => {
-    ipcRenderer.send('vev:input', ev)
+    ipcRenderer.send('pane:input', ev)
   },
-  onState: (cb: (state: unknown) => void) => subscribe('vev:state', cb),
-  onPreview: (cb: (data: Uint8Array, mime: string) => void) => subscribe('vev:preview', cb),
-  onCursor: (cb: (cursor: string) => void) => subscribe('vev:cursor', cb)
+  onState: (cb: (state: unknown) => void) => subscribe('pane:state', cb),
+  onPreview: (cb: (data: Uint8Array, mime: string) => void) => subscribe('pane:preview', cb),
+  onCursor: (cb: (cursor: string) => void) => subscribe('pane:cursor', cb)
 }
 
-contextBridge.exposeInMainWorld('vev', api)
+contextBridge.exposeInMainWorld('pane', api)

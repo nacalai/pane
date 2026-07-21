@@ -1,10 +1,10 @@
 /** Internal page ids — never raw file paths in the URL bar. */
-export const INTERNAL_TESTCARD = 'vev:testcard'
+export const INTERNAL_TESTCARD = 'pane:testcard'
 
 export type UrlResult = { ok: true; url: string } | { ok: false; error: string }
 
 /**
- * User input → loadable URL. Allowlist: http(s), about:blank, vev:testcard.
+ * User input → loadable URL. Allowlist: http(s), about:blank, pane:testcard.
  * Bare hosts get https://. file:, javascript:, data: are rejected — the content
  * window renders arbitrary remote pages and must never reach local files.
  */

@@ -1,6 +1,6 @@
-import type { VevState } from '@shared/schema'
+import type { PaneState } from '@shared/schema'
 
-function pill(state: VevState): { cls: string; text: string } {
+function pill(state: PaneState): { cls: string; text: string } {
   switch (state.ndi) {
     case 'live':
       // NDI counts TCP connections, not receivers — one receiver (e.g. OBS) opens ~2.
@@ -23,13 +23,13 @@ function cleanVersion(v: string | null): string {
   return m ? `NDI ${m[1]}` : 'NDI'
 }
 
-export function TopBar({ state }: { state: VevState }): React.JSX.Element {
+export function TopBar({ state }: { state: PaneState }): React.JSX.Element {
   const p = pill(state)
   return (
     <header className="topbar">
       <div className="topbar__brand">
         <span className="wordmark">
-          VEV<span className="wordmark__dot">.</span>
+          Pane<span className="wordmark__dot">.</span>
         </span>
         <span className="topbar__tag">webpage → NDI</span>
       </div>

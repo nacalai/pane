@@ -1,5 +1,5 @@
 /**
- * VEV entrypoint. Lifecycle, hardening, crash backstops, selfcheck mode.
+ * Pane entrypoint. Lifecycle, hardening, crash backstops, selfcheck mode.
  *
  * Offscreen rendering (CPU path) requires hardware acceleration OFF and a
  * forced 1x device scale so paint buffers match the configured resolution.
@@ -10,7 +10,7 @@ import { existsSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ConfigStore } from './config'
-import { VevApp } from './app'
+import { PaneApp } from './app'
 import { registerIpc } from './ipc'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -19,8 +19,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 // AND so userData (persisted config) resolves to the SAME folder in every launch mode.
 // Without setName, a direct/dev launch falls back to "Electron" and settings would appear
 // to not persist because they'd land in a different directory than the packaged app.
-app.setName('VEV')
-app.setAppUserModelId('no.creavid.vev')
+app.setName('Pane')
+app.setAppUserModelId('no.creavid.pane')
 
 let tray: Tray | null = null
 /** True once the user really wants to quit — the X button only hides to tray. */
@@ -30,7 +30,7 @@ let isQuitting = false
 const HIDDEN_FLAG = '--hidden'
 
 /**
- * Register/unregister VEV as a Windows login item. Only meaningful when packaged
+ * Register/unregister Pane as a Windows login item. Only meaningful when packaged
  * (in dev the exe is electron.exe and we must not pollute the machine's startup).
  * openAtLogin + a --hidden arg → boots straight to the tray.
  */
@@ -44,7 +44,7 @@ function readDisplays(): DisplayInfo[] {
   const primaryId = screen.getPrimaryDisplay().id
   return screen.getAllDisplays().map((d, i) => ({
     id: d.id,
-    label: d.label || `Skjerm ${i + 1}`,
+    label: d.label || `Display ${i + 1}`,
     width: d.size.width,
     height: d.size.height,
     primary: d.id === primaryId
@@ -70,40 +70,40 @@ function resolveResourcesDir(): string {
 
 // GPU compositing stays ON by default — measured on this machine: studio OSR 30 fps,
 // presenter capturePage 30 fps (software rendering dropped presenter to ~21 fps).
-// VEV_SWRENDER=1 falls back to software rendering if a GPU/driver misbehaves.
-if (process.env.VEV_SWRENDER === '1') app.disableHardwareAcceleration()
+// PANE_SWRENDER=1 falls back to software rendering if a GPU/driver misbehaves.
+if (process.env.PANE_SWRENDER === '1') app.disableHardwareAcceleration()
 app.commandLine.appendSwitch('force-device-scale-factor', '1')
 
-const SELFCHECK = process.env.VEV_SELFCHECK === '1'
+const SELFCHECK = process.env.PANE_SELFCHECK === '1'
 /** Tray/close-to-tray behavior test — enables the tray + close handler under selfcheck. */
-const SELFCHECK_TRAY = process.env.VEV_SELFCHECK_TRAY === '1'
-const SELFCHECK_MS = Number(process.env.VEV_SELFCHECK_MS) > 0 ? Number(process.env.VEV_SELFCHECK_MS) : 20_000
+const SELFCHECK_TRAY = process.env.PANE_SELFCHECK_TRAY === '1'
+const SELFCHECK_MS = Number(process.env.PANE_SELFCHECK_MS) > 0 ? Number(process.env.PANE_SELFCHECK_MS) : 20_000
 const SELFCHECK_CRASH_AT_MS = 8_000
 const SELFCHECK_MIN_FRAMES = 300
 
-let vev: VevApp | null = null
+let pane: PaneApp | null = null
 let shuttingDown = false
 
 function teardown(): void {
   if (shuttingDown) return
   shuttingDown = true
   try {
-    vev?.shutdown()
+    pane?.shutdown()
   } catch (e) {
     console.error('[main] teardown:', e)
   }
 }
 
-// On-air-safe backstops: VEV is a live NDI source. A stray rejection/exception must NOT
+// On-air-safe backstops: Pane is a live NDI source. A stray rejection/exception must NOT
 // take the feed off air, so we log LOUDLY and keep running rather than exit — the frame
 // loop, NDI sender, IPC handlers and loaders all fail closed on their own. (Truly fatal
 // native faults still crash the process; nothing in JS can prevent those.) Real teardown
 // happens only on deliberate quit (before-quit).
 process.on('uncaughtException', (err) => {
-  console.error('[main] uncaughtException (holder VEV i live):', err)
+  console.error('[main] uncaughtException (holder Pane i live):', err)
 })
 process.on('unhandledRejection', (reason) => {
-  console.error('[main] unhandledRejection (holder VEV i live):', reason)
+  console.error('[main] unhandledRejection (holder Pane i live):', reason)
 })
 
 if (!app.requestSingleInstanceLock()) {
@@ -113,26 +113,26 @@ if (!app.requestSingleInstanceLock()) {
     // Selfcheck must never pollute the real config (mode/url changes would
     // otherwise greet the next human launch).
     const store = new ConfigStore(
-      SELFCHECK ? join(app.getPath('temp'), 'vev-selfcheck-config') : app.getPath('userData')
+      SELFCHECK ? join(app.getPath('temp'), 'pane-selfcheck-config') : app.getPath('userData')
     )
     const resourcesDir = resolveResourcesDir()
     console.log('[main] resources:', resourcesDir)
-    vev = new VevApp(store, resourcesDir)
-    vev.initNdiRuntime()
+    pane = new PaneApp(store, resourcesDir)
+    pane.initNdiRuntime()
 
     // Start hidden when launched at boot (--hidden) or when the user set start-minimized.
     // (Under selfcheck this is normally forced off for determinism, but the tray selfcheck
     // opts back in so the hidden-startup path can be verified.)
     const startHidden =
       (!SELFCHECK || SELFCHECK_TRAY) &&
-      (process.argv.includes(HIDDEN_FLAG) || vev.state().config.startMinimized)
+      (process.argv.includes(HIDDEN_FLAG) || pane.state().config.startMinimized)
 
     const control = new BrowserWindow({
       width: 1280,
       height: 900,
       minWidth: 1040,
       minHeight: 700,
-      title: 'VEV — Creavid',
+      title: 'Pane — Creavid',
       backgroundColor: '#FAFBFC',
       show: false, // shown explicitly below unless starting hidden to tray
       webPreferences: {
@@ -148,8 +148,8 @@ if (!app.requestSingleInstanceLock()) {
       if (!startHidden) control.show()
     })
     // Keep the OS login item in sync with saved config on every launch.
-    syncLoginItem(vev.state().config.launchAtLogin)
-    vev.onLoginItemChange((cfg) => syncLoginItem(cfg.launchAtLogin))
+    syncLoginItem(pane.state().config.launchAtLogin)
+    pane.onLoginItemChange((cfg) => syncLoginItem(cfg.launchAtLogin))
     control.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
     control.webContents.on('will-navigate', (event) => event.preventDefault())
 
@@ -176,29 +176,29 @@ if (!app.requestSingleInstanceLock()) {
 
     if (!SELFCHECK || SELFCHECK_TRAY) tray = createTray(showControl, resourcesDir)
 
-    vev.attachControl(control)
-    registerIpc(vev)
-    vev.startHttp()
+    pane.attachControl(control)
+    registerIpc(pane)
+    pane.startHttp()
     // Feed the monitor list now and whenever it changes (plug/unplug/rearrange).
-    vev.setDisplays(readDisplays())
-    const refreshDisplays = (): void => vev?.setDisplays(readDisplays())
+    pane.setDisplays(readDisplays())
+    const refreshDisplays = (): void => pane?.setDisplays(readDisplays())
     screen.on('display-added', refreshDisplays)
     screen.on('display-removed', refreshDisplays)
     screen.on('display-metrics-changed', refreshDisplays)
-    vev.capture.start()
+    pane.capture.start()
 
-    if (process.env.VEV_SELFCHECK_URL) {
-      const r = vev.navigate(process.env.VEV_SELFCHECK_URL)
+    if (process.env.PANE_SELFCHECK_URL) {
+      const r = pane.navigate(process.env.PANE_SELFCHECK_URL)
       if (!r.ok) console.error('[main] selfcheck navigate:', r.error)
     }
-    if (process.env.VEV_SELFCHECK_MODE === 'presenter') {
-      const r = vev.applySettings({ mode: 'presenter' })
+    if (process.env.PANE_SELFCHECK_MODE === 'presenter') {
+      const r = pane.applySettings({ mode: 'presenter' })
       if (!r.ok) console.error('[main] selfcheck mode:', r.error)
     }
-    if (vev.state().ndi !== 'no-runtime' && (vev.state().config.autoStart || SELFCHECK)) {
-      const r = vev.startNdi()
+    if (pane.state().ndi !== 'no-runtime' && (pane.state().config.autoStart || SELFCHECK)) {
+      const r = pane.startNdi()
       if (!r.ok) console.error('[main] NDI start:', r.error)
-      else console.log(`[main] NDI ready — source "${vev.state().config.ndiName}" is on air`)
+      else console.log(`[main] NDI ready — source "${pane.state().config.ndiName}" is on air`)
     }
 
     if (process.env.ELECTRON_RENDERER_URL) {
@@ -232,17 +232,17 @@ function createTray(showControl: () => void, resourcesDir: string): Tray {
     ? nativeImage.createFromPath(iconPath).resize({ width: 32, height: 32 })
     : nativeImage.createEmpty()
   const t = new Tray(image)
-  t.setToolTip('VEV — webpage → NDI')
+  t.setToolTip('Pane — webpage → NDI')
   const rebuildMenu = (): void => {
-    const live = vev?.state().ndi === 'live'
+    const live = pane?.state().ndi === 'live'
     t.setContextMenu(
       Menu.buildFromTemplate([
         { label: live ? '● NDI on air' : 'NDI off', enabled: false },
         { type: 'separator' },
-        { label: 'Open VEV', click: showControl },
+        { label: 'Open Pane', click: showControl },
         { type: 'separator' },
         {
-          label: 'Quit VEV',
+          label: 'Quit Pane',
           click: () => {
             isQuitting = true
             app.quit()
@@ -259,13 +259,13 @@ function createTray(showControl: () => void, resourcesDir: string): Tray {
 }
 
 /**
- * VEV_SELFCHECK=1: autonomous smoke — run 20 s on the testcard (or VEV_SELFCHECK_URL),
+ * PANE_SELFCHECK=1: autonomous smoke — run 20 s on the testcard (or PANE_SELFCHECK_URL),
  * write selfcheck.json + a control-window screenshot, exit 0 iff frames flowed and NDI
- * was live. VEV_SELFCHECK_CRASH=1 additionally kills the content renderer mid-run to
+ * was live. PANE_SELFCHECK_CRASH=1 additionally kills the content renderer mid-run to
  * prove crash recovery.
  */
 function runSelfcheck(control: BrowserWindow): void {
-  const dir = process.env.VEV_SELFCHECK_DIR || process.cwd()
+  const dir = process.env.PANE_SELFCHECK_DIR || process.cwd()
   let framesAtCrash: number | null = null
   const tray_test:
     | { closeHiddenNotDestroyed: boolean; trayPresent: boolean; startedHidden: boolean }
@@ -281,20 +281,20 @@ function runSelfcheck(control: BrowserWindow): void {
     }, 2000)
   }
 
-  if (process.env.VEV_SELFCHECK_CRASH === '1') {
+  if (process.env.PANE_SELFCHECK_CRASH === '1') {
     setTimeout(() => {
-      if (!vev) return
-      framesAtCrash = vev.state().framesSent
+      if (!pane) return
+      framesAtCrash = pane.state().framesSent
       console.log(`[selfcheck] crashing content renderer at ${framesAtCrash} frames`)
-      vev.capture.crashForTest()
+      pane.capture.crashForTest()
     }, SELFCHECK_CRASH_AT_MS)
   }
 
-  // Prove the on-air backstops keep VEV alive: a stray uncaughtException + unhandledRejection
+  // Prove the on-air backstops keep Pane alive: a stray uncaughtException + unhandledRejection
   // must NOT take the app down. The run still PASSes (frames keep flowing) → app stayed live.
-  if (process.env.VEV_SELFCHECK_THROW === '1') {
+  if (process.env.PANE_SELFCHECK_THROW === '1') {
     setTimeout(() => {
-      framesAtCrash = vev?.state().framesSent ?? 0
+      framesAtCrash = pane?.state().framesSent ?? 0
       console.log(`[selfcheck] injecting synthetic faults at ${framesAtCrash} frames`)
       void Promise.reject(new Error('selfcheck synthetic unhandledRejection'))
       setTimeout(() => {
@@ -319,8 +319,8 @@ function runSelfcheck(control: BrowserWindow): void {
 
   setTimeout(() => {
     void (async () => {
-      if (!vev) return
-      const st = vev.state()
+      if (!pane) return
+      const st = pane.state()
       const result = {
         ndi: st.ndi,
         ndiVersion: st.ndiVersion,
@@ -331,7 +331,7 @@ function runSelfcheck(control: BrowserWindow): void {
         staticPage: st.staticPage,
         url: st.nav.url,
         title: st.nav.title,
-        sources: vev.sender.findSources(),
+        sources: pane.sender.findSources(),
         recovered: framesAtCrash === null ? null : st.framesSent > framesAtCrash + 30,
         tray: tray_test
       }

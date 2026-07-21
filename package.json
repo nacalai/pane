@@ -1,7 +1,7 @@
 {
-  "name": "creavid-vev",
+  "name": "pane",
   "version": "0.1.0",
-  "description": "VEV — webpage → NDI. Render any page offscreen at broadcast resolution and publish it as a real NDI source (video + alpha), navigable through a live preview.",
+  "description": "Pane — webpage → NDI. Render any page offscreen at broadcast resolution and publish it as a real NDI source (video + alpha), navigable through a live preview.",
   "main": "out/main/index.js",
   "type": "module",
   "scripts": {
@@ -14,8 +14,8 @@
     "lint": "eslint ."
   },
   "build": {
-    "appId": "no.creavid.vev",
-    "productName": "VEV",
+    "appId": "no.creavid.pane",
+    "productName": "Pane",
     "directories": { "output": "release", "buildResources": "build" },
     "files": ["out/**/*", "resources/**/*", "package.json"],
     "asarUnpack": ["node_modules/koffi/**"],
@@ -29,7 +29,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "VEV"
+      "shortcutName": "Pane"
     }
   },
   "dependencies": {

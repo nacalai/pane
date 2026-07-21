@@ -27,7 +27,7 @@ describe('parseConfig', () => {
     expect(cfg.url).toBe('https://vg.no/')
     expect(cfg.fps).toBe(50)
     expect(cfg.width).toBe(1920)
-    expect(cfg.ndiName).toBe('VEV')
+    expect(cfg.ndiName).toBe('Pane')
   })
 
   it('strips unknown keys instead of failing (old config files must load)', () => {
@@ -43,22 +43,22 @@ describe('parseConfig', () => {
   it('does not mutate DEFAULT_CONFIG', () => {
     const a = parseConfig(undefined)
     a.url = 'mutated'
-    expect(DEFAULT_CONFIG.url).toBe('vev:testcard')
+    expect(DEFAULT_CONFIG.url).toBe('pane:testcard')
   })
 })
 
 describe('sanitizeNdiName', () => {
   it('strips parens and control chars, collapses whitespace', () => {
-    expect(sanitizeNdiName('  VEV\u0000\u001f  (2)  ')).toBe('VEV 2')
+    expect(sanitizeNdiName('  Pane\u0000\u001f  (2)  ')).toBe('Pane 2')
   })
   it('preserves spaces and ordinary punctuation (regression: accidental char range)', () => {
-    expect(sanitizeNdiName('My VEV 2')).toBe('My VEV 2')
-    expect(sanitizeNdiName('VEV Program')).toBe('VEV Program')
+    expect(sanitizeNdiName('My Pane 2')).toBe('My Pane 2')
+    expect(sanitizeNdiName('Pane Program')).toBe('Pane Program')
     expect(sanitizeNdiName("Nyheter #1 & 'mer'")).toBe("Nyheter #1 & 'mer'")
   })
-  it('falls back to VEV when empty after cleaning', () => {
-    expect(sanitizeNdiName('((()))')).toBe('VEV')
-    expect(sanitizeNdiName('   ')).toBe('VEV')
+  it('falls back to Pane when empty after cleaning', () => {
+    expect(sanitizeNdiName('((()))')).toBe('Pane')
+    expect(sanitizeNdiName('   ')).toBe('Pane')
   })
   it('clamps to 63 chars', () => {
     expect(sanitizeNdiName('x'.repeat(100)).length).toBe(63)

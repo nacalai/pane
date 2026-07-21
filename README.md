@@ -1,7 +1,7 @@
-# VEV — nettside → NDI
+# Pane — nettside → NDI
 
-**VEV** (norsk: *vev*) gjør en hvilken som helst nettside om til en ekte **NDI-kilde**.
-Skriv inn en adresse, naviger siden i sanntid, og hele vinduet publiseres som `MASKIN (VEV)`
+**Pane** (norsk: *pane*) gjør en hvilken som helst nettside om til en ekte **NDI-kilde**.
+Skriv inn en adresse, naviger siden i sanntid, og hele vinduet publiseres som `MASKIN (Pane)`
 på nettverket — klar for vMix, OBS/DistroAV, TriCaster m.fl.
 
 En moderne Creavid-erstatning for [rse/vingester](https://github.com/rse/vingester) (2022, forlatt)
@@ -20,7 +20,7 @@ npm run dist      # bygg Windows-installer (NSIS) → release/
 
 **Installert app:** én instans totalt (andre oppstart henter frem det åpne vinduet).
 **X-knappen lukker aldri** — den minimerer til systemstatusfeltet der NDI fortsetter å
-sende. Høyreklikk tray-ikonet → «Avslutt VEV» for å faktisk lukke.
+sende. Høyreklikk tray-ikonet → «Avslutt Pane» for å faktisk lukke.
 
 Krav: [NDI Tools/Runtime](https://ndi.video/tools/) installert (DLL-en finnes automatisk).
 Uten NDI-runtime kjører appen fortsatt — med tydelig banner, forhåndsvisning og navigasjon.
@@ -68,7 +68,7 @@ fjernstyre sendingen — og Host-headeren pinnes mot DNS-rebinding.
 - **Transparent bakgrunn** (studio) gir ekte alfa i NDI — HTML-grafikk keyes rett over program.
 - Lyd fra siden er dempet lokalt som standard («Spill lyd på denne maskinen» slår på).
   NDI-lyd er ikke med i v1.
-- `VEV_SWRENDER=1` faller tilbake til programvare-rendering om GPU-en lager trøbbel.
+- `PANE_SWRENDER=1` faller tilbake til programvare-rendering om GPU-en lager trøbbel.
 
 ## Arkitektur
 
@@ -89,9 +89,9 @@ Electron-versjonen (verifisert empirisk med og uten GPU) — derfor capturePage-
 
 ```bash
 npm run typecheck && npm run lint && npm test    # porter (54 tester)
-VEV_SELFCHECK=1 npm start                        # 20 s røyktest → selfcheck.json + .png
-VEV_SELFCHECK=1 VEV_SELFCHECK_MODE=presenter npm start
-node tools/ndi-probe.cjs VEV 10                  # uavhengig NDI-mottaker: frames/fps/pixler
+PANE_SELFCHECK=1 npm start                        # 20 s røyktest → selfcheck.json + .png
+PANE_SELFCHECK=1 PANE_SELFCHECK_MODE=presenter npm start
+node tools/ndi-probe.cjs Pane 10                  # uavhengig NDI-mottaker: frames/fps/pixler
 ```
 
 Se `docs/superpowers/specs/` og `docs/superpowers/plans/` for design og plan.

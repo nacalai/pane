@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { containRect } from '@shared/geometry'
-import type { InputEventReq, InputModifier, VevState } from '@shared/schema'
+import type { InputEventReq, InputModifier, PaneState } from '@shared/schema'
 
 const MOVE_THROTTLE_MS = 16
 
@@ -47,7 +47,7 @@ export function Preview({
   previewUrl,
   cursor
 }: {
-  state: VevState
+  state: PaneState
   previewUrl: string | null
   cursor: string
 }): React.JSX.Element {
@@ -78,7 +78,7 @@ export function Preview({
     return { x: clamp01(px / cr.w), y: clamp01(py / cr.h) }
   }
 
-  const send = (ev: InputEventReq): void => window.vev.sendInput(ev)
+  const send = (ev: InputEventReq): void => window.pane.sendInput(ev)
 
   const button = (b: number): 0 | 1 | 2 => (b === 1 ? 1 : b === 2 ? 2 : 0)
 
@@ -96,7 +96,7 @@ export function Preview({
     boxRef.current?.focus()
     // Mouse side buttons (back/forward) must never become left clicks in the page.
     if (e.button === 3 || e.button === 4) {
-      void window.vev.navAction(e.button === 3 ? 'back' : 'forward')
+      void window.pane.navAction(e.button === 3 ? 'back' : 'forward')
       return
     }
     if (e.button > 2) return
@@ -170,7 +170,7 @@ export function Preview({
       {nav.failure && (
         <div className="banner banner--coral">
           <b>Couldn't load</b> {nav.failure.url} — {nav.failure.description}
-          <button className="btn btn--small" onClick={() => void window.vev.navAction('reload')}>
+          <button className="btn btn--small" onClick={() => void window.pane.navAction('reload')}>
             Try again
           </button>
         </div>
@@ -180,7 +180,7 @@ export function Preview({
           <b>The page is unresponsive.</b>
           <button
             className="btn btn--small"
-            onClick={() => void window.vev.navAction('force-reload')}
+            onClick={() => void window.pane.navAction('force-reload')}
           >
             Force restart
           </button>
