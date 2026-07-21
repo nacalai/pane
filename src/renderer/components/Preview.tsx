@@ -204,7 +204,11 @@ export function Preview({
         onKeyUp={onKey('up')}
         onContextMenu={(e) => e.preventDefault()}
       >
-        {previewUrl ? (
+        {!config.showPreview ? (
+          <div className="preview__empty">
+            Forhåndsvisning av — NDI-utgangen kjører som normalt
+          </div>
+        ) : previewUrl ? (
           <img className="preview__img" src={previewUrl} alt="" draggable={false} />
         ) : (
           <div className="preview__empty">Venter på bilde …</div>

@@ -16,8 +16,8 @@ export function StatsStrip({ state }: { state: VevState }): React.JSX.Element {
         </b>{' '}
         @ {config.fps}
       </span>
-      <span>
-        <b>{state.receivers}</b> mottaker{state.receivers === 1 ? '' : 'e'}
+      <span title="NDI teller TCP-tilkoblinger, ikke mottakere — én mottaker (f.eks. OBS) åpner ca. 2">
+        <b>{state.receivers}</b> tilkobling{state.receivers === 1 ? '' : 'er'}
       </span>
       <span className={state.staticPage ? 'stats--static' : 'stats--live'}>
         {state.staticPage ? 'statisk side' : 'levende bilde'}

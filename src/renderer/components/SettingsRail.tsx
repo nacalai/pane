@@ -240,6 +240,14 @@ export function SettingsRail({ state }: { state: VevState }): React.JSX.Element 
           />
           <span>Reduser striper i graderinger (dither)</span>
         </label>
+        <label className="check" title="Slå av forhåndsvisningen i appen for å spare litt CPU (påvirker ikke NDI-utgangen)">
+          <input
+            type="checkbox"
+            checked={config.showPreview}
+            onChange={(e) => apply({ showPreview: e.target.checked })}
+          />
+          <span>Vis forhåndsvisning i appen</span>
+        </label>
         <p className="card__note">
           {presenter
             ? 'Transparent bakgrunn gjelder bare studio-modus (skjult vindu).'

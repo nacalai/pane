@@ -285,7 +285,7 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
     this.pacer.onFrame(Date.now())
 
     const now = Date.now()
-    if (now - this.lastPreviewAt >= PREVIEW_INTERVAL_MS) {
+    if (this.cfg.showPreview && now - this.lastPreviewAt >= PREVIEW_INTERVAL_MS) {
       this.lastPreviewAt = now
       try {
         const small = img.resize({ width: PREVIEW_WIDTH })

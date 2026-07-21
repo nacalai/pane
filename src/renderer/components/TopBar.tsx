@@ -3,11 +3,9 @@ import type { VevState } from '@shared/schema'
 function pill(state: VevState): { cls: string; text: string } {
   switch (state.ndi) {
     case 'live':
+      // NDI counts TCP connections, not receivers — one receiver (e.g. OBS) opens ~2.
       return state.receivers > 0
-        ? {
-            cls: 'pill pill--coral',
-            text: `● PÅ LUFTA · ${state.receivers} MOTTAKER${state.receivers === 1 ? '' : 'E'}`
-          }
+        ? { cls: 'pill pill--coral', text: '● PÅ LUFTA · SETT' }
         : { cls: 'pill pill--mint', text: 'PÅ LUFTA' }
     case 'no-runtime':
       return { cls: 'pill pill--amber', text: 'NDI-RUNTIME MANGLER' }

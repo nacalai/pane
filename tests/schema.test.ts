@@ -95,11 +95,14 @@ describe('IPC schemas', () => {
     expect(parseConfig(undefined).httpPort).toBe(9350)
   })
 
-  it('validates and defaults the dither flag', () => {
+  it('validates and defaults the dither + preview flags', () => {
     expect(SettingsPatchSchema.safeParse({ dither: true }).success).toBe(true)
     expect(SettingsPatchSchema.safeParse({ dither: 1 }).success).toBe(false)
     expect(parseConfig(undefined).dither).toBe(false)
     expect(parseConfig({ dither: true }).dither).toBe(true)
+    expect(parseConfig(undefined).showPreview).toBe(true)
+    expect(parseConfig({ showPreview: false }).showPreview).toBe(false)
+    expect(SettingsPatchSchema.safeParse({ showPreview: 'no' }).success).toBe(false)
   })
 
   it('validates the presenter display id', () => {

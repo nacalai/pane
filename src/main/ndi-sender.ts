@@ -19,8 +19,8 @@ export const FOURCC_BGRA = 0x41524742
 /** 'B','G','R','X' — opaque: NDI skips the alpha plane (cleaner + lighter). Default. */
 export const FOURCC_BGRX = 0x58524742
 const FRAME_FORMAT_PROGRESSIVE = 1
-/** NDIlib_send_timecode_synthesize (INT64_MAX): SDK stamps UTC timecodes for us. */
-const TIMECODE_SYNTHESIZE = 0x7fffffffffffffffn
+/** NDI timecodes are in 100 ns units (10,000,000 per second). */
+const TIMECODE_UNITS_PER_SEC = 10_000_000
 
 export type NdiInitResult = { ok: true; version: string } | { ok: false; error: string }
 export type NdiResult = { ok: true } | { ok: false; error: string }
@@ -46,6 +46,9 @@ export class NdiSender {
   private senderName = ''
   private warnedBadFrame = false
   private loggedFourcc = false
+  /** Even, monotonic frame clock (100 ns units). Regular timecodes let receivers sync with a
+   *  small buffer; synthesized (send-time) timecodes jitter and make OBS buffer up to ~1s. */
+  private timecodeAccum = 0
 
   /** Load DLL + NDIlib_initialize + a find instance. Call once; safe to call again after failure. */
   init(): NdiInitResult {
@@ -129,6 +132,7 @@ export class NdiSender {
     if (!this.fns) return { ok: false, error: 'NDI-runtime er ikke lastet' }
     if (this.send && this.senderName === name) return { ok: true }
     this.destroySender()
+    this.timecodeAccum = 0
     try {
       this.send = this.fns.send_create!({
         p_ndi_name: name,
@@ -178,6 +182,8 @@ export class NdiSender {
       this.loggedFourcc = true
       console.log(`[ndi] sender FourCC = ${opaque ? 'BGRX (opaque)' : 'BGRA (alpha)'}`)
     }
+    const timecode = BigInt(Math.round(this.timecodeAccum))
+    this.timecodeAccum += (TIMECODE_UNITS_PER_SEC * fpsD) / fpsN // exactly one frame duration
     this.fns.send_video!(this.send, {
       xres: w,
       yres: h,
@@ -186,7 +192,7 @@ export class NdiSender {
       frame_rate_D: fpsD,
       picture_aspect_ratio: w / h,
       frame_format_type: FRAME_FORMAT_PROGRESSIVE,
-      timecode: TIMECODE_SYNTHESIZE,
+      timecode,
       p_data: bgra,
       line_stride_in_bytes: w * 4,
       p_metadata: null,
