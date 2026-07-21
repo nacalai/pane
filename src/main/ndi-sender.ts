@@ -55,7 +55,7 @@ export class NdiSender {
     if (this.fns) return { ok: true, version: this.versionString() }
     try {
       const dllPath = dllCandidates().find((p) => existsSync(p))
-      if (!dllPath) return { ok: false, error: 'NDI runtime ikke funnet — installer NDI Tools (ndi.video)' }
+      if (!dllPath) return { ok: false, error: 'NDI runtime not found — install NDI Tools (ndi.video)' }
       const dllDir = dirname(dllPath)
       if (!process.env.PATH?.split(delimiter).includes(dllDir)) {
         process.env.PATH = dllDir + delimiter + process.env.PATH
@@ -109,13 +109,13 @@ export class NdiSender {
 
       if (!this.fns.initialize!()) {
         this.fns = null
-        return { ok: false, error: 'NDIlib_initialize() feilet (CPU-støtte/lisens)' }
+        return { ok: false, error: 'NDIlib_initialize() failed (CPU support/license)' }
       }
       this.find = this.fns.find_create!({ show_local_sources: true, p_groups: null, p_extra_ips: null })
       return { ok: true, version: this.versionString() }
     } catch (e) {
       this.fns = null
-      return { ok: false, error: `NDI-lasting feilet: ${(e as Error).message}` }
+      return { ok: false, error: `NDI load failed: ${(e as Error).message}` }
     }
   }
 
@@ -129,7 +129,7 @@ export class NdiSender {
 
   /** Publish the named sender. clock_video=false: VEV paces frames itself. */
   createSender(name: string): NdiResult {
-    if (!this.fns) return { ok: false, error: 'NDI-runtime er ikke lastet' }
+    if (!this.fns) return { ok: false, error: 'NDI runtime is not loaded' }
     if (this.send && this.senderName === name) return { ok: true }
     this.destroySender()
     this.timecodeAccum = 0
@@ -140,12 +140,12 @@ export class NdiSender {
         clock_video: false,
         clock_audio: false
       })
-      if (!this.send) return { ok: false, error: `Klarte ikke å opprette NDI-kilden «${name}»` }
+      if (!this.send) return { ok: false, error: `Could not create NDI source "${name}"` }
       this.senderName = name
       return { ok: true }
     } catch (e) {
       this.send = null
-      return { ok: false, error: `NDI send_create feilet: ${(e as Error).message}` }
+      return { ok: false, error: `NDI send_create failed: ${(e as Error).message}` }
     }
   }
 

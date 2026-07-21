@@ -80,7 +80,16 @@ body {
 .topbar__brand {
   display: flex;
   align-items: baseline;
-  gap: 14px;
+  gap: 12px;
+}
+.topbar__tag::before {
+  content: '';
+  display: inline-block;
+  width: 1px;
+  height: 11px;
+  margin-right: 12px;
+  vertical-align: -1px;
+  background: rgba(255, 255, 255, 0.18);
 }
 .wordmark {
   font-family: var(--font-display);
@@ -93,18 +102,39 @@ body {
 }
 .topbar__tag {
   font-size: 10px;
-  letter-spacing: 0.28em;
-  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
 }
 .topbar__status {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 }
-.topbar__source {
+/* NDI source chip — tidy label + name instead of the raw NDI build string */
+.ndi-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px 5px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+}
+.ndi-chip__label {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  color: var(--cyan-soft);
+}
+.ndi-chip__name {
   font-family: var(--font-mono);
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.55);
+  font-size: 12px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 8px;
+  border-radius: 999px;
 }
 .pill {
   font-family: var(--font-display);

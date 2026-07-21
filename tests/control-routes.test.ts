@@ -102,6 +102,6 @@ describe('routeCommand', () => {
 
   it('unknown endpoints 404', () => {
     const r = routeCommand('/api/nope', q())
-    expect(r).toEqual({ ok: false, status: 404, error: 'ukjent endepunkt: /api/nope' })
+    expect(r).toEqual({ ok: false, status: 404, error: 'unknown endpoint: /api/nope' })
   })
 })

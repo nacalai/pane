@@ -39,7 +39,7 @@ export default function App(): React.JSX.Element {
   useEffect(() => window.vev.onCursor(setCursor), [])
 
   if (!state) {
-    return <div className="boot">Laster VEV …</div>
+    return <div className="boot">Loading VEV …</div>
   }
 
   return (

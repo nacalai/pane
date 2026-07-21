@@ -53,14 +53,14 @@ export class ControlServer {
     server.on('error', (e: NodeJS.ErrnoException) => {
       this.lastError =
         e.code === 'EADDRINUSE'
-          ? `port ${next.port} er opptatt — endre port under Fjernstyring`
-          : `HTTP-feil: ${e.message}`
+          ? `port ${next.port} is in use — change the port under Remote control`
+          : `HTTP error: ${e.message}`
       console.error('[http]', this.lastError)
       this.server = null
     })
     server.listen(next.port, host, () => {
       this.lastError = null
-      console.log(`[http] fjernstyring på http://${host === '0.0.0.0' ? '<LAN-IP>' : host}:${next.port}/api/…`)
+      console.log(`[http] remote control at http://${host === '0.0.0.0' ? '<LAN-IP>' : host}:${next.port}/api/…`)
     })
     this.server = server
   }
@@ -90,13 +90,13 @@ export class ControlServer {
     }
     try {
       if (req.method !== 'GET' && req.method !== 'POST') {
-        send(405, { ok: false, error: 'bare GET/POST' })
+        send(405, { ok: false, error: 'GET/POST only' })
         return
       }
       const url = new URL(req.url ?? '/', 'http://vev.local')
       const auth = this.authorized(req)
       if (!auth.ok) {
-        send(403, { ok: false, error: `ikke autorisert: ${auth.reason}` })
+        send(403, { ok: false, error: `not authorized: ${auth.reason}` })
         return
       }
       const routed = routeCommand(url.pathname, url.searchParams)

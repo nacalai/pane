@@ -46,19 +46,19 @@ export function routeCommand(pathname: string, q: URLSearchParams): RouteResult 
 
     case '/api/go': {
       const url = (q.get('url') ?? '').trim()
-      if (!url) return bad('mangler ?url=')
-      if (url.length > 4096) return bad('url for lang')
+      if (!url) return bad('missing ?url=')
+      if (url.length > 4096) return bad('url too long')
       return { ok: true, cmd: { kind: 'go', url } }
     }
 
     case '/api/key': {
       const key = q.get('key') ?? ''
-      if (!key || key.length > 32) return bad('mangler eller ugyldig ?key=')
+      if (!key || key.length > 32) return bad('missing or invalid ?key=')
       const modifiers: InputModifier[] = []
       for (const m of (q.get('mod') ?? '').split(',')) {
         const mm = m.trim().toLowerCase()
         if (!mm) continue
-        if (!MODIFIERS.has(mm as InputModifier)) return bad(`ukjent modifikator: ${mm}`)
+        if (!MODIFIERS.has(mm as InputModifier)) return bad(`unknown modifier: ${mm}`)
         modifiers.push(mm as InputModifier)
       }
       return { ok: true, cmd: { kind: 'key', key, modifiers } }
@@ -67,7 +67,7 @@ export function routeCommand(pathname: string, q: URLSearchParams): RouteResult 
     case '/api/scroll': {
       const dy = q.has('dy') ? Number(q.get('dy')) : 600
       const dx = q.has('dx') ? Number(q.get('dx')) : 0
-      if (!Number.isFinite(dy) || !Number.isFinite(dx)) return bad('dy/dx må være tall')
+      if (!Number.isFinite(dy) || !Number.isFinite(dx)) return bad('dy/dx must be numbers')
       return {
         ok: true,
         cmd: {
@@ -82,8 +82,8 @@ export function routeCommand(pathname: string, q: URLSearchParams): RouteResult 
       const x = q.has('x') ? Number(q.get('x')) : 0.5
       const y = q.has('y') ? Number(q.get('y')) : 0.5
       const button = q.has('button') ? Number(q.get('button')) : 0
-      if (!Number.isFinite(x) || !Number.isFinite(y)) return bad('x/y må være tall 0..1')
-      if (button !== 0 && button !== 1 && button !== 2) return bad('button må være 0, 1 eller 2')
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return bad('x/y must be numbers 0..1')
+      if (button !== 0 && button !== 1 && button !== 2) return bad('button must be 0, 1 or 2')
       return { ok: true, cmd: { kind: 'click', x: clamp01(x), y: clamp01(y), button } }
     }
 
@@ -98,12 +98,12 @@ export function routeCommand(pathname: string, q: URLSearchParams): RouteResult 
     case '/api/presenter':
     case '/api/presenter/open': {
       const fs = q.get('fullscreen')
-      if (fs !== null && fs !== '0' && fs !== '1') return bad('fullscreen må være 0 eller 1')
+      if (fs !== null && fs !== '0' && fs !== '1') return bad('fullscreen must be 0 or 1')
       const disp = q.get('display')
       let displayId: number | undefined
       if (disp !== null) {
         const n = Number(disp)
-        if (!Number.isInteger(n) || n < 0) return bad('display må være et heltall ≥ 0')
+        if (!Number.isInteger(n) || n < 0) return bad('display must be an integer ≥ 0')
         displayId = n
       }
       return {
@@ -122,6 +122,6 @@ export function routeCommand(pathname: string, q: URLSearchParams): RouteResult 
       return { ok: true, cmd: { kind: 'mode', mode: 'studio' } }
 
     default:
-      return bad(`ukjent endepunkt: ${path}`, 404)
+      return bad(`unknown endpoint: ${path}`, 404)
   }
 }

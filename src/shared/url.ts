@@ -10,9 +10,10 @@ export type UrlResult = { ok: true; url: string } | { ok: false; error: string }
  */
 export function normalizeUrl(input: string): UrlResult {
   const raw = input.trim()
-  if (!raw) return { ok: false, error: 'Tom adresse' }
+  if (!raw) return { ok: false, error: 'Empty address' }
   const lower = raw.toLowerCase()
-  if (lower === INTERNAL_TESTCARD || lower === 'testkort') return { ok: true, url: INTERNAL_TESTCARD }
+  if (lower === INTERNAL_TESTCARD || lower === 'testcard' || lower === 'testkort')
+    return { ok: true, url: INTERNAL_TESTCARD }
   if (lower === 'about:blank') return { ok: true, url: 'about:blank' }
 
   const hasScheme = /^[a-z][a-z0-9+.-]*:/i.test(raw)
@@ -21,11 +22,11 @@ export function normalizeUrl(input: string): UrlResult {
   try {
     parsed = new URL(candidate)
   } catch {
-    return { ok: false, error: `Ugyldig adresse: ${raw}` }
+    return { ok: false, error: `Invalid address: ${raw}` }
   }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    return { ok: false, error: `Bare http(s)-adresser er tillatt (fikk ${parsed.protocol})` }
+    return { ok: false, error: `Only http(s) addresses are allowed (got ${parsed.protocol})` }
   }
-  if (!parsed.hostname) return { ok: false, error: `Ugyldig adresse: ${raw}` }
+  if (!parsed.hostname) return { ok: false, error: `Invalid address: ${raw}` }
   return { ok: true, url: parsed.toString() }
 }

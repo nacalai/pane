@@ -198,7 +198,7 @@ if (!app.requestSingleInstanceLock()) {
     if (vev.state().ndi !== 'no-runtime' && (vev.state().config.autoStart || SELFCHECK)) {
       const r = vev.startNdi()
       if (!r.ok) console.error('[main] NDI start:', r.error)
-      else console.log(`[main] NDI ready — kilde «${vev.state().config.ndiName}» er på lufta`)
+      else console.log(`[main] NDI ready — source "${vev.state().config.ndiName}" is on air`)
     }
 
     if (process.env.ELECTRON_RENDERER_URL) {
@@ -232,17 +232,17 @@ function createTray(showControl: () => void, resourcesDir: string): Tray {
     ? nativeImage.createFromPath(iconPath).resize({ width: 32, height: 32 })
     : nativeImage.createEmpty()
   const t = new Tray(image)
-  t.setToolTip('VEV — nettside → NDI')
+  t.setToolTip('VEV — webpage → NDI')
   const rebuildMenu = (): void => {
     const live = vev?.state().ndi === 'live'
     t.setContextMenu(
       Menu.buildFromTemplate([
-        { label: live ? '● NDI på lufta' : 'NDI av', enabled: false },
+        { label: live ? '● NDI on air' : 'NDI off', enabled: false },
         { type: 'separator' },
-        { label: 'Åpne VEV', click: showControl },
+        { label: 'Open VEV', click: showControl },
         { type: 'separator' },
         {
-          label: 'Avslutt VEV',
+          label: 'Quit VEV',
           click: () => {
             isQuitting = true
             app.quit()

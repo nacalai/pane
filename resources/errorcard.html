@@ -2,7 +2,7 @@
 <html lang="no">
 <head>
 <meta charset="utf-8">
-<title>VEV — lastefeil</title>
+<title>VEV — load error</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { width: 100%; height: 100%; overflow: hidden; }
@@ -30,17 +30,17 @@
 <body>
   <div class="wordmark">VEV<span>.</span></div>
   <div class="card">
-    <div class="badge">LASTEFEIL</div>
-    <h1>Fikk ikke lastet siden</h1>
+    <div class="badge">LOAD ERROR</div>
+    <h1>Couldn't load the page</h1>
     <div class="url" id="url"></div>
     <div class="err" id="err"></div>
-    <div class="hint">Trykk «Oppdater» i VEV-kontrollen for å prøve igjen.</div>
+    <div class="hint">Press "Reload" in the VEV control to try again.</div>
   </div>
 <script>
   'use strict';
   var q = new URLSearchParams(location.search);
   document.getElementById('url').textContent = q.get('url') || '';
-  document.getElementById('err').textContent = q.get('err') || 'Ukjent feil';
+  document.getElementById('err').textContent = q.get('err') || 'Unknown error';
 </script>
 </body>
 </html>

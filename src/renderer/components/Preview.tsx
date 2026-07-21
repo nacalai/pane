@@ -158,31 +158,31 @@ export function Preview({
     <div className="stage">
       {state.ndi === 'no-runtime' && (
         <div className="banner banner--amber">
-          <b>NDI-runtime mangler.</b> {state.ndiError} — forhåndsvisning og navigasjon virker,
-          men ingenting sendes.
+          <b>NDI runtime missing.</b> {state.ndiError} — preview and navigation work, but nothing
+          is being sent.
         </div>
       )}
       {state.ndi === 'error' && state.ndiError && (
         <div className="banner banner--coral">
-          <b>NDI-feil:</b> {state.ndiError}
+          <b>NDI error:</b> {state.ndiError}
         </div>
       )}
       {nav.failure && (
         <div className="banner banner--coral">
-          <b>Kunne ikke laste</b> {nav.failure.url} — {nav.failure.description}
+          <b>Couldn't load</b> {nav.failure.url} — {nav.failure.description}
           <button className="btn btn--small" onClick={() => void window.vev.navAction('reload')}>
-            Prøv igjen
+            Try again
           </button>
         </div>
       )}
       {nav.unresponsive && (
         <div className="banner banner--amber">
-          <b>Siden henger.</b>
+          <b>The page is unresponsive.</b>
           <button
             className="btn btn--small"
             onClick={() => void window.vev.navAction('force-reload')}
           >
-            Tving omstart
+            Force restart
           </button>
         </div>
       )}
@@ -205,22 +205,20 @@ export function Preview({
         onContextMenu={(e) => e.preventDefault()}
       >
         {!config.showPreview ? (
-          <div className="preview__empty">
-            Forhåndsvisning av — NDI-utgangen kjører som normalt
-          </div>
+          <div className="preview__empty">Preview off — NDI output is running normally</div>
         ) : previewUrl ? (
           <img className="preview__img" src={previewUrl} alt="" draggable={false} />
         ) : (
-          <div className="preview__empty">Venter på bilde …</div>
+          <div className="preview__empty">Waiting for image …</div>
         )}
         {nav.loading && <div className="preview__loading" />}
       </div>
       <div className="stage__hint">
         {config.mode === 'presenter'
-          ? 'Presenter-modus: styr direkte i det synlige vinduet (F11 = fullskjerm)'
+          ? 'Presenter mode: control the page directly in the visible window (F11 = fullscreen)'
           : focused
-            ? 'Tastatur og mus sendes til siden — Esc for å slippe'
-            : 'Klikk i bildet for å styre siden'}
+            ? 'Keyboard and mouse go to the page — Esc to release'
+            : 'Click in the image to control the page'}
       </div>
     </div>
   )

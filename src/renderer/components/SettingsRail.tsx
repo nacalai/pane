@@ -29,7 +29,7 @@ export function SettingsRail({ state }: { state: VevState }): React.JSX.Element 
     const w = Number(customW)
     const h = Number(customH)
     if (!Number.isInteger(w) || !Number.isInteger(h) || w < 320 || h < 240 || w > 3840 || h > 2160) {
-      setError('Egendefinert oppløsning må være 320–3840 × 240–2160')
+      setError('Custom resolution must be 320–3840 × 240–2160')
       return
     }
     apply({ width: w, height: h })
@@ -41,9 +41,9 @@ export function SettingsRail({ state }: { state: VevState }): React.JSX.Element 
   return (
     <aside className="rail">
       <section className="card">
-        <h2 className="card__title">NDI-utgang</h2>
+        <h2 className="card__title">NDI output</h2>
         <label className="field">
-          <span className="field__label">Kildenavn</span>
+          <span className="field__label">Source name</span>
           <input
             key={config.ndiName}
             className="field__input"
@@ -63,7 +63,7 @@ export function SettingsRail({ state }: { state: VevState }): React.JSX.Element 
           disabled={state.ndi === 'no-runtime'}
           onClick={() => void (live ? window.vev.stop() : window.vev.start())}
         >
-          {live ? 'STOPP NDI' : 'START NDI'}
+          {live ? 'STOP NDI' : 'START NDI'}
         </button>
         <label className="check">
           <input
@@ -71,19 +71,19 @@ export function SettingsRail({ state }: { state: VevState }): React.JSX.Element 
             checked={config.autoStart}
             onChange={(e) => apply({ autoStart: e.target.checked })}
           />
-          <span>Start NDI ved oppstart</span>
+          <span>Start NDI on launch</span>
         </label>
       </section>
 
       <section className="card">
-        <h2 className="card__title">Oppstart</h2>
+        <h2 className="card__title">Startup</h2>
         <label className="check">
           <input
             type="checkbox"
             checked={config.launchAtLogin}
             onChange={(e) => apply({ launchAtLogin: e.target.checked })}
           />
-          <span>Start med Windows (skjult i tray)</span>
+          <span>Start with Windows (hidden in tray)</span>
         </label>
         <label className="check">
           <input
@@ -91,33 +91,33 @@ export function SettingsRail({ state }: { state: VevState }): React.JSX.Element 
             checked={config.startMinimized}
             onChange={(e) => apply({ startMinimized: e.target.checked })}
           />
-          <span>Start minimert i tray</span>
+          <span>Start minimized to tray</span>
         </label>
         <p className="card__note">
-          Lukkeknappen (X) avslutter ikke — den minimerer til systemstatusfeltet der NDI
-          fortsetter. Høyreklikk tray-ikonet for å avslutte. «Start med Windows» virker kun i
-          den installerte appen.
+          The close button (X) doesn't quit — it minimizes to the system tray where NDI keeps
+          running. Right-click the tray icon to quit. "Start with Windows" only works in the
+          installed app.
         </p>
       </section>
 
       <section className="card">
-        <h2 className="card__title">Presenter-visning</h2>
+        <h2 className="card__title">Presenter view</h2>
         <p className="card__note">
-          Åpne siden i et synlig vindu presentereren styrer direkte — klikk, grafer, skjemaer.
-          NDI sender nøyaktig det samme bildet. F11 veksler fullskjerm; Esc avslutter fullskjerm.
+          Open the page in a visible window the presenter controls directly — clicks, charts,
+          forms. NDI sends exactly the same image. F11 toggles fullscreen; Esc exits fullscreen.
         </p>
         <label className="field">
-          <span className="field__label">Skjerm</span>
+          <span className="field__label">Display</span>
           <select
             className="field__input"
             value={config.presenterDisplayId}
             onChange={(e) => apply({ presenterDisplayId: Number(e.target.value) })}
           >
-            <option value={0}>Primær skjerm (auto)</option>
+            <option value={0}>Primary display (auto)</option>
             {state.displays.map((d, i) => (
               <option key={d.id} value={d.id}>
-                Skjerm {i + 1}
-                {d.primary ? ' (primær)' : ''} — {d.label} {d.width}×{d.height}
+                Display {i + 1}
+                {d.primary ? ' (primary)' : ''} — {d.label} {d.width}×{d.height}
               </option>
             ))}
           </select>
@@ -127,33 +127,33 @@ export function SettingsRail({ state }: { state: VevState }): React.JSX.Element 
             className={`btn ${presenter && !state.presenterFullscreen ? 'btn--active' : ''}`}
             onClick={() => apply({ mode: 'presenter', presenterFullscreen: false })}
           >
-            Åpne i vindu
+            Open windowed
           </button>
           <button
             className={`btn ${presenter && state.presenterFullscreen ? 'btn--active' : ''}`}
             onClick={() => apply({ mode: 'presenter', presenterFullscreen: true })}
           >
-            Åpne i fullskjerm
+            Open fullscreen
           </button>
         </div>
         {presenter && (
           <button className="btn btn--stop" onClick={() => apply({ mode: 'studio' })}>
-            Lukk presenter (tilbake til studio)
+            Close presenter (back to studio)
           </button>
         )}
         <p className="card__note">
           {presenter
             ? state.presenterFullscreen
-              ? 'Åpen i fullskjerm på valgt skjerm.'
-              : 'Åpen som vindu på valgt skjerm.'
-            : 'Studio: siden rendres skjult i nøyaktig oppløsning; du styrer den via forhåndsvisningen.'}
+              ? 'Open fullscreen on the selected display.'
+              : 'Open as a window on the selected display.'
+            : 'Studio: the page renders hidden at exact resolution; you control it via the preview.'}
         </p>
       </section>
 
       <section className="card">
-        <h2 className="card__title">Bilde</h2>
+        <h2 className="card__title">Image</h2>
         <label className="field">
-          <span className="field__label">Oppløsning</span>
+          <span className="field__label">Resolution</span>
           <select
             className="field__input"
             value={showCustom ? 'custom' : presetValue}
@@ -174,7 +174,7 @@ export function SettingsRail({ state }: { state: VevState }): React.JSX.Element 
                 {p.label}
               </option>
             ))}
-            <option value="custom">Egendefinert …</option>
+            <option value="custom">Custom …</option>
           </select>
         </label>
         {(showCustom || presetValue === 'custom') && (
@@ -197,12 +197,12 @@ export function SettingsRail({ state }: { state: VevState }): React.JSX.Element 
               onChange={(e) => setCustomH(e.target.value)}
             />
             <button className="btn btn--small" onClick={applyCustom}>
-              Bruk
+              Apply
             </button>
           </div>
         )}
         <label className="field">
-          <span className="field__label">Bilder per sekund</span>
+          <span className="field__label">Frames per second</span>
           <select
             className="field__input"
             value={config.fps}
@@ -215,14 +215,14 @@ export function SettingsRail({ state }: { state: VevState }): React.JSX.Element 
             ))}
           </select>
         </label>
-        <label className="check" title={presenter ? 'Bare tilgjengelig i studio-modus' : undefined}>
+        <label className="check" title={presenter ? 'Only available in studio mode' : undefined}>
           <input
             type="checkbox"
             checked={config.transparent}
             disabled={presenter}
             onChange={(e) => apply({ transparent: e.target.checked })}
           />
-          <span>Transparent bakgrunn (alfa i NDI)</span>
+          <span>Transparent background (alpha in NDI)</span>
         </label>
         <label className="check">
           <input
@@ -230,40 +230,40 @@ export function SettingsRail({ state }: { state: VevState }): React.JSX.Element 
             checked={config.localAudio}
             onChange={(e) => apply({ localAudio: e.target.checked })}
           />
-          <span>Spill lyd på denne maskinen</span>
+          <span>Play audio on this machine</span>
         </label>
-        <label className="check" title="Legger nesten usynlig støy på siden for å bryte opp striper i graderinger">
+        <label className="check" title="Adds a nearly invisible noise layer to the page to break up banding in gradients">
           <input
             type="checkbox"
             checked={config.dither}
             onChange={(e) => apply({ dither: e.target.checked })}
           />
-          <span>Reduser striper i graderinger (dither)</span>
+          <span>Reduce banding in gradients (dither)</span>
         </label>
-        <label className="check" title="Slå av forhåndsvisningen i appen for å spare litt CPU (påvirker ikke NDI-utgangen)">
+        <label className="check" title="Turn off the in-app preview to save some CPU (does not affect the NDI output)">
           <input
             type="checkbox"
             checked={config.showPreview}
             onChange={(e) => apply({ showPreview: e.target.checked })}
           />
-          <span>Vis forhåndsvisning i appen</span>
+          <span>Show preview in the app</span>
         </label>
         <p className="card__note">
           {presenter
-            ? 'Transparent bakgrunn gjelder bare studio-modus (skjult vindu).'
-            : 'Bytte av transparent bakgrunn bygger nettleservinduet på nytt — siden lastes om.'}
+            ? 'Transparent background applies to studio mode only (hidden window).'
+            : 'Toggling transparent background rebuilds the browser window — the page reloads.'}
         </p>
       </section>
 
       <section className="card">
-        <h2 className="card__title">Fjernstyring · Stream Deck</h2>
+        <h2 className="card__title">Remote control · Stream Deck</h2>
         <label className="check">
           <input
             type="checkbox"
             checked={config.httpEnabled}
             onChange={(e) => apply({ httpEnabled: e.target.checked })}
           />
-          <span>HTTP-API på</span>
+          <span>HTTP API on</span>
         </label>
         {config.httpEnabled && (
           <>
@@ -292,7 +292,7 @@ export function SettingsRail({ state }: { state: VevState }): React.JSX.Element 
                 checked={config.httpLan}
                 onChange={(e) => apply({ httpLan: e.target.checked })}
               />
-              <span>Tillat LAN (krever token)</span>
+              <span>Allow LAN (requires token)</span>
             </label>
             {config.httpLan && (
               <label className="field">
@@ -301,7 +301,7 @@ export function SettingsRail({ state }: { state: VevState }): React.JSX.Element 
                   key={config.httpToken}
                   className="field__input"
                   type="text"
-                  placeholder="hemmelig-token"
+                  placeholder="secret-token"
                   defaultValue={config.httpToken}
                   onBlur={(e) => {
                     if (e.target.value !== config.httpToken) apply({ httpToken: e.target.value })

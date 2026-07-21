@@ -35,7 +35,7 @@ export function UrlBar({ state }: { state: VevState }): React.JSX.Element {
       <div className="urlrow__inner">
         <button
           className="btn btn--icon"
-          title="Tilbake"
+          title="Back"
           disabled={!state.nav.canGoBack}
           onClick={() => act('back')}
         >
@@ -43,13 +43,13 @@ export function UrlBar({ state }: { state: VevState }): React.JSX.Element {
         </button>
         <button
           className="btn btn--icon"
-          title="Frem"
+          title="Forward"
           disabled={!state.nav.canGoForward}
           onClick={() => act('forward')}
         >
           →
         </button>
-        <button className="btn btn--icon" title="Oppdater" onClick={() => act('reload')}>
+        <button className="btn btn--icon" title="Reload" onClick={() => act('reload')}>
           ⟳
         </button>
         <input
@@ -58,7 +58,7 @@ export function UrlBar({ state }: { state: VevState }): React.JSX.Element {
           type="text"
           spellCheck={false}
           value={value}
-          placeholder="Skriv inn adresse — f.eks. vg.no"
+          placeholder="Enter address — e.g. vg.no"
           onChange={(e) => {
             editingRef.current = true
             setValue(e.target.value)
@@ -76,10 +76,10 @@ export function UrlBar({ state }: { state: VevState }): React.JSX.Element {
           }}
         />
         <button className="btn btn--primary" onClick={() => go()}>
-          Gå
+          Go
         </button>
-        <button className="btn btn--ghost" title="VEV-testkortet" onClick={() => go('vev:testcard')}>
-          Testkort
+        <button className="btn btn--ghost" title="VEV test card" onClick={() => go('vev:testcard')}>
+          Test card
         </button>
       </div>
       {error && <div className="urlrow__error">{error}</div>}

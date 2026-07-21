@@ -117,7 +117,7 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
     const r = this.navigate(this.cfg.url)
     if (!r.ok) {
       // A corrupt persisted URL must never yield silent black output.
-      console.warn(`[capture] lagret adresse avvist (${r.error}) — laster testkortet`)
+      console.warn(`[capture] saved address rejected (${r.error}) — loading the test card`)
       this.loadTarget(INTERNAL_TESTCARD)
     }
   }
@@ -205,8 +205,8 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
       // that recurses, nesting the failed URL into an ever-growing query string. Stop here;
       // the control-UI banner still surfaces the failure.
       if (validatedURL.includes('errorcard.html')) {
-        console.error('[capture] errorcard.html kunne ikke lastes — viser kun banner')
-        this.failure = { code, description: 'Ressursfil mangler (errorcard.html)', url: this.currentTarget }
+        console.error('[capture] errorcard.html failed to load — showing banner only')
+        this.failure = { code, description: 'Resource file missing (errorcard.html)', url: this.currentTarget }
         this.pushNav()
         return
       }
@@ -562,7 +562,7 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
     if (win.isDestroyed()) return
     const target = this.resolveDisplay()
     console.log(
-      `[capture] presenter → skjerm ${target.label} (${target.bounds.x},${target.bounds.y} ${target.size.width}×${target.size.height}) fullscreen=${this.cfg.presenterFullscreen}`
+      `[capture] presenter → display ${target.label} (${target.bounds.x},${target.bounds.y} ${target.size.width}×${target.size.height}) fullscreen=${this.cfg.presenterFullscreen}`
     )
     if (win.isFullScreen()) win.setFullScreen(false)
     win.setContentSize(this.cfg.width, this.cfg.height)

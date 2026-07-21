@@ -24,11 +24,11 @@ function guarded<T>(
 ): (event: unknown, raw: unknown) => IpcResult {
   return (_event, raw) => {
     const parsed = schema.safeParse(raw)
-    if (!parsed.success) return { ok: false, error: `Ugyldig forespørsel: ${parsed.error.issues[0]?.message ?? 'ukjent'}` }
+    if (!parsed.success) return { ok: false, error: `Invalid request: ${parsed.error.issues[0]?.message ?? 'unknown'}` }
     try {
       return fn(parsed.data)
     } catch (e) {
-      console.error('[ipc] handler feilet:', e)
+      console.error('[ipc] handler failed:', e)
       return { ok: false, error: (e as Error).message }
     }
   }

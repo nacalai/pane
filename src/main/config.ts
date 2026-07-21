@@ -33,7 +33,7 @@ export class ConfigStore {
       writeFileSync(tmp, JSON.stringify(cfg, null, 2))
       renameSync(tmp, this.filePath)
     } catch (e) {
-      console.error('[config] lagring feilet:', (e as Error).message)
+      console.error('[config] save failed:', (e as Error).message)
     }
   }
 }

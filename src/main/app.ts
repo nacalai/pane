@@ -56,7 +56,7 @@ export class VevApp {
     // Presenter closed their window → drop back to hidden studio mode.
     this.capture.on('presenterClosed', () => {
       const r = this.applySettings({ mode: 'studio' })
-      if (!r.ok) console.error('[app] tilbake til studio-modus feilet:', r.error)
+      if (!r.ok) console.error('[app] returning to studio mode failed:', r.error)
     })
   }
 
@@ -158,7 +158,7 @@ export class VevApp {
 
   startNdi(): IpcResult {
     if (!this.runtimeOk) {
-      return { ok: false, error: this.ndiError ?? 'NDI-runtime er ikke tilgjengelig' }
+      return { ok: false, error: this.ndiError ?? 'NDI runtime is not available' }
     }
     const r = this.sender.createSender(this.config.ndiName)
     if (!r.ok) {

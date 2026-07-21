@@ -43,25 +43,25 @@ function tokenMatches(header: string | undefined, token: string): boolean {
 export function authorizeRequest(input: AuthInput): { ok: true } | { ok: false; reason: string } {
   // Browser-originated requests are never legitimate control-API callers.
   if (input.originHeader !== undefined) {
-    return { ok: false, reason: 'nettleser-forespørsler avvises (Origin)' }
+    return { ok: false, reason: 'browser-originated requests are rejected (Origin)' }
   }
   if (input.secFetchSite !== undefined && input.secFetchSite !== 'none') {
-    return { ok: false, reason: 'nettleser-forespørsler avvises (Sec-Fetch-Site)' }
+    return { ok: false, reason: 'browser-originated requests are rejected (Sec-Fetch-Site)' }
   }
 
   if (LOOPBACK_ADDRS.has(input.remoteAddress)) {
     const hostname = input.hostHeader.replace(/:\d+$/, '').toLowerCase()
     if (!LOOPBACK_HOSTS.has(hostname)) {
-      return { ok: false, reason: 'ugyldig Host-header (DNS-rebinding?)' }
+      return { ok: false, reason: 'invalid Host header (DNS rebinding?)' }
     }
     return { ok: true }
   }
 
   if (!input.lan || !input.token) {
-    return { ok: false, reason: 'eksterne kall krever LAN-modus + token' }
+    return { ok: false, reason: 'external calls require LAN mode + token' }
   }
   if (!tokenMatches(input.authorizationHeader, input.token)) {
-    return { ok: false, reason: 'ugyldig token (Authorization: Bearer …)' }
+    return { ok: false, reason: 'invalid token (Authorization: Bearer …)' }
   }
   return { ok: true }
 }
