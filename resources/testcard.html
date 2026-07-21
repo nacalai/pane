@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<title>VEV testkort</title>
+<style>
+  /* Self-contained — no network. VAPOR-flavoured broadcast testcard. */
+  :root {
+    --ink: #0C1116;
+    --blue: #0284C7;
+    --blue-deep: #036CA5;
+    --cyan: #1FB6F6;
+    --coral: #FF5A47;
+    --mint: #2EE6A6;
+    --amber: #FFB23E;
+    --paper: #FAFBFC;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; }
+  body {
+    background: var(--ink);
+    color: var(--paper);
+    font-family: 'Familjen Grotesk', 'Segoe UI', -apple-system, sans-serif;
+    display: flex; flex-direction: column;
+  }
+  .grid {
+    position: absolute; inset: 0; opacity: .35; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(255,255,255,.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.06) 1px, transparent 1px);
+    background-size: 80px 80px;
+  }
+  .corner { position: absolute; width: 64px; height: 64px; border: 3px solid rgba(255,255,255,.85); }
+  .corner.tl { top: 24px; left: 24px; border-right: 0; border-bottom: 0; }
+  .corner.tr { top: 24px; right: 24px; border-left: 0; border-bottom: 0; }
+  .corner.bl { bottom: 24px; left: 24px; border-right: 0; border-top: 0; }
+  .corner.br { bottom: 24px; right: 24px; border-left: 0; border-top: 0; }
+
+  header {
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding: 4.5vh 6vw 0;
+  }
+  .wordmark { font-weight: 600; font-size: 7.5vh; letter-spacing: -0.02em; }
+  .wordmark .accent { color: var(--cyan); }
+  .brand { font-size: 2.2vh; letter-spacing: .45em; color: rgba(255,255,255,.55); text-transform: uppercase; }
+
+  main { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 4vh; padding: 0 6vw; }
+  .clock { font-variant-numeric: tabular-nums; font-size: 13vh; font-weight: 600; letter-spacing: -0.01em; line-height: 1; }
+  .clock .tenths { color: var(--cyan); font-size: 7vh; }
+  .date { font-size: 2.6vh; color: rgba(255,255,255,.6); margin-top: 1vh; }
+
+  .bars { display: flex; height: 12vh; border: 1px solid rgba(255,255,255,.25); }
+  .bars div { flex: 1; }
+  .ramp { display: flex; height: 5vh; border: 1px solid rgba(255,255,255,.25); border-top: 0; }
+  .ramp div { flex: 1; }
+
+  .sweepline { position: relative; height: 2.4vh; background: rgba(255,255,255,.08); overflow: hidden; }
+  .sweep {
+    position: absolute; top: 0; bottom: 0; width: 12%;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    animation: sweep 4s linear infinite;
+  }
+  @keyframes sweep { from { left: -12%; } to { left: 100%; } }
+
+  footer {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0 6vw 4.5vh; font-size: 2.4vh; color: rgba(255,255,255,.75);
+    font-variant-numeric: tabular-nums;
+  }
+  footer b { color: #fff; font-weight: 600; }
+  .pill {
+    border: 1px solid var(--cyan); color: var(--cyan);
+    padding: .4vh 1.4vh; letter-spacing: .12em; font-size: 1.9vh;
+  }
+</style>
+</head>
+<body>
+  <div class="grid"></div>
+  <div class="corner tl"></div><div class="corner tr"></div>
+  <div class="corner bl"></div><div class="corner br"></div>
+
+  <header>
+    <div class="wordmark">VEV<span class="accent">.</span></div>
+    <div class="brand">Creavid · nettside → NDI</div>
+  </header>
+
+  <main>
+    <div>
+      <div class="clock"><span id="hms">00:00:00</span><span class="tenths" id="tenths">.0</span></div>
+      <div class="date" id="date"></div>
+    </div>
+    <div>
+      <div class="bars">
+        <div style="background:#FFFFFF"></div>
+        <div style="background:#FFB23E"></div>
+        <div style="background:#1FB6F6"></div>
+        <div style="background:#2EE6A6"></div>
+        <div style="background:#0284C7"></div>
+        <div style="background:#FF5A47"></div>
+        <div style="background:#036CA5"></div>
+        <div style="background:#0C1116"></div>
+      </div>
+      <div class="ramp" id="ramp"></div>
+      <div class="sweepline"><div class="sweep"></div></div>
+    </div>
+  </main>
+
+  <footer>
+    <span><b id="res">–</b> @ <b id="fps">–</b> fps</span>
+    <span class="pill" id="ndi">NDI · VEV</span>
+  </footer>
+
+<script>
+  'use strict';
+  // 16-step grayscale ramp
+  (function () {
+    var ramp = document.getElementById('ramp');
+    for (var i = 0; i < 16; i++) {
+      var v = Math.round((i / 15) * 255);
+      var d = document.createElement('div');
+      d.style.background = 'rgb(' + v + ',' + v + ',' + v + ')';
+      ramp.appendChild(d);
+    }
+  })();
+
+  // Params injected by VEV (w, h, fps, name)
+  (function () {
+    var q = new URLSearchParams(location.search);
+    var w = q.get('w') || String(screen.width);
+    var h = q.get('h') || String(screen.height);
+    document.getElementById('res').textContent = w + '×' + h;
+    document.getElementById('fps').textContent = q.get('fps') || '?';
+    document.getElementById('ndi').textContent = 'NDI · ' + (q.get('name') || 'VEV');
+  })();
+
+  // Clock with tenths — continuous motion proves live frames end-to-end.
+  (function () {
+    var hms = document.getElementById('hms');
+    var tenths = document.getElementById('tenths');
+    var dateEl = document.getElementById('date');
+    var days = ['søndag','mandag','tirsdag','onsdag','torsdag','fredag','lørdag'];
+    function pad(n) { return n < 10 ? '0' + n : String(n); }
+    function tick() {
+      var d = new Date();
+      hms.textContent = pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+      tenths.textContent = '.' + Math.floor(d.getMilliseconds() / 100);
+      dateEl.textContent = days[d.getDay()] + ' ' + d.getDate() + '.' + (d.getMonth() + 1) + '.' + d.getFullYear();
+    }
+    tick();
+    setInterval(tick, 100);
+  })();
+</script>
+</body>
+</html>
