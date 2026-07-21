@@ -255,7 +255,7 @@ body {
 }
 .preview {
   position: relative;
-  width: min(100%, calc((100vh - 320px) * 16 / 9));
+  /* width set inline from the configured aspect ratio */
   max-height: 100%;
   background: #000;
   box-shadow: var(--shadow-float);
@@ -447,6 +447,11 @@ body {
 .check input:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
+}
+.code-note {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  word-break: break-all;
 }
 .rail__error {
   background: rgba(255, 90, 71, 0.08);

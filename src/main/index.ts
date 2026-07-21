@@ -14,7 +14,10 @@ import { registerIpc } from './ipc'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-app.disableHardwareAcceleration()
+// GPU compositing stays ON by default — measured on this machine: studio OSR 30 fps,
+// presenter capturePage 30 fps (software rendering dropped presenter to ~21 fps).
+// VEV_SWRENDER=1 falls back to software rendering if a GPU/driver misbehaves.
+if (process.env.VEV_SWRENDER === '1') app.disableHardwareAcceleration()
 app.commandLine.appendSwitch('force-device-scale-factor', '1')
 
 const SELFCHECK = process.env.VEV_SELFCHECK === '1'
@@ -51,7 +54,11 @@ if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
   void app.whenReady().then(() => {
-    const store = new ConfigStore(app.getPath('userData'))
+    // Selfcheck must never pollute the real config (mode/url changes would
+    // otherwise greet the next human launch).
+    const store = new ConfigStore(
+      SELFCHECK ? join(app.getPath('temp'), 'vev-selfcheck-config') : app.getPath('userData')
+    )
     const resourcesDir = join(app.getAppPath(), 'resources')
     vev = new VevApp(store, resourcesDir)
     vev.initNdiRuntime()
@@ -75,13 +82,33 @@ if (!app.requestSingleInstanceLock()) {
     control.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
     control.webContents.on('will-navigate', (event) => event.preventDefault())
 
+    // The hidden capture window keeps 'window-all-closed' from ever firing —
+    // without this, closing the control window leaves a headless process
+    // streaming NDI while the single-instance lock bricks relaunch.
+    control.on('closed', () => {
+      teardown()
+      app.quit()
+    })
+    app.on('second-instance', () => {
+      if (!control.isDestroyed()) {
+        if (control.isMinimized()) control.restore()
+        control.show()
+        control.focus()
+      }
+    })
+
     vev.attachControl(control)
     registerIpc(vev)
+    vev.startHttp()
     vev.capture.start()
 
     if (process.env.VEV_SELFCHECK_URL) {
       const r = vev.navigate(process.env.VEV_SELFCHECK_URL)
       if (!r.ok) console.error('[main] selfcheck navigate:', r.error)
+    }
+    if (process.env.VEV_SELFCHECK_MODE === 'presenter') {
+      const r = vev.applySettings({ mode: 'presenter' })
+      if (!r.ok) console.error('[main] selfcheck mode:', r.error)
     }
     if (vev.state().ndi !== 'no-runtime' && (vev.state().config.autoStart || SELFCHECK)) {
       const r = vev.startNdi()

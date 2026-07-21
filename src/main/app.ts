@@ -7,6 +7,8 @@ import { powerSaveBlocker, type BrowserWindow } from 'electron'
 import type { ConfigStore } from './config'
 import { NdiSender } from './ndi-sender'
 import { VevCapture, type CaptureStats } from './capture'
+import { ControlServer } from './control-server'
+import type { ControlCommand } from '@shared/control-routes'
 import {
   sanitizeNdiName,
   type IpcResult,
@@ -29,6 +31,8 @@ export class VevApp {
   private psbId: number | null = null
   private downThis = false
 
+  readonly http = new ControlServer((cmd) => this.execCommand(cmd))
+
   constructor(
     private readonly store: ConfigStore,
     resourcesDir: string
@@ -40,6 +44,84 @@ export class VevApp {
       this.lastStats = s
       this.pushState()
     })
+    // Presenter closed their window → drop back to hidden studio mode.
+    this.capture.on('presenterClosed', () => {
+      const r = this.applySettings({ mode: 'studio' })
+      if (!r.ok) console.error('[app] tilbake til studio-modus feilet:', r.error)
+    })
+  }
+
+  startHttp(): void {
+    this.http.apply({
+      enabled: this.config.httpEnabled,
+      port: this.config.httpPort,
+      lan: this.config.httpLan,
+      token: this.config.httpToken
+    })
+  }
+
+  /** Stream Deck / Companion command → the same paths the UI uses. */
+  execCommand(cmd: ControlCommand): { ok: true; data: unknown } | { ok: false; error: string } {
+    switch (cmd.kind) {
+      case 'status':
+        return { ok: true, data: this.state() }
+      case 'nav':
+        this.capture.navAction(cmd.action)
+        return { ok: true, data: null }
+      case 'go': {
+        const r = this.navigate(cmd.url)
+        return r.ok ? { ok: true, data: null } : r
+      }
+      case 'testcard': {
+        const r = this.navigate('vev:testcard')
+        return r.ok ? { ok: true, data: null } : r
+      }
+      case 'key':
+        this.capture.injectInput({ kind: 'key', direction: 'down', key: cmd.key, modifiers: cmd.modifiers })
+        this.capture.injectInput({ kind: 'key', direction: 'up', key: cmd.key, modifiers: cmd.modifiers })
+        return { ok: true, data: null }
+      case 'scroll':
+        // DOM convention in, input-map inverts to Chromium's.
+        this.capture.injectInput({
+          kind: 'wheel',
+          x: 0.5,
+          y: 0.5,
+          deltaX: cmd.dx,
+          deltaY: cmd.dy,
+          modifiers: []
+        })
+        return { ok: true, data: null }
+      case 'click':
+        this.capture.injectInput({
+          kind: 'down',
+          x: cmd.x,
+          y: cmd.y,
+          button: cmd.button,
+          clickCount: 1,
+          modifiers: []
+        })
+        this.capture.injectInput({
+          kind: 'up',
+          x: cmd.x,
+          y: cmd.y,
+          button: cmd.button,
+          clickCount: 1,
+          modifiers: []
+        })
+        return { ok: true, data: null }
+      case 'ndi': {
+        const r = cmd.on ? this.startNdi() : this.stopNdi()
+        return r.ok ? { ok: true, data: null } : r
+      }
+      case 'mode': {
+        const patch: SettingsPatch = { mode: cmd.mode }
+        if (cmd.mode === 'presenter' && cmd.fullscreen !== undefined) {
+          patch.presenterFullscreen = cmd.fullscreen
+        }
+        const r = this.applySettings(patch)
+        return r.ok ? { ok: true, data: null } : r
+      }
+    }
   }
 
   /** Load the NDI runtime (not the sender). Called once at startup. */
@@ -106,9 +188,22 @@ export class VevApp {
     const next: VevConfig = { ...this.config, ...patch }
     next.ndiName = sanitizeNdiName(next.ndiName)
     const prevName = this.config.ndiName
+    const httpChanged =
+      next.httpEnabled !== this.config.httpEnabled ||
+      next.httpPort !== this.config.httpPort ||
+      next.httpLan !== this.config.httpLan ||
+      next.httpToken !== this.config.httpToken
     this.config = next
     this.store.save(next)
     this.capture.applyConfig(next)
+    if (httpChanged) {
+      this.http.apply({
+        enabled: next.httpEnabled,
+        port: next.httpPort,
+        lan: next.httpLan,
+        token: next.httpToken
+      })
+    }
     if (next.ndiName !== prevName && this.sender.isLive()) {
       // NDI has no rename — recreate the sender under the new name.
       this.sender.destroySender()
@@ -133,6 +228,8 @@ export class VevApp {
       sentFps: this.lastStats.sentFps,
       framesSent: this.lastStats.framesSent,
       staticPage: this.lastStats.staticPage,
+      presenterFullscreen: this.capture.isPresenterFullscreen(),
+      httpError: this.http.error,
       nav: this.capture.currentNav(),
       config: { ...this.config }
     }
@@ -148,6 +245,11 @@ export class VevApp {
   shutdown(): void {
     if (this.downThis) return
     this.downThis = true
+    try {
+      this.http.stop()
+    } catch {
+      /* ignore */
+    }
     try {
       this.capture.dispose()
     } catch {

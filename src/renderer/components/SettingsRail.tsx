@@ -36,6 +36,7 @@ export function SettingsRail({ state }: { state: VevState }): React.JSX.Element 
   }
 
   const live = state.ndi === 'live'
+  const presenter = config.mode === 'presenter'
 
   return (
     <aside className="rail">
@@ -72,6 +73,34 @@ export function SettingsRail({ state }: { state: VevState }): React.JSX.Element 
           />
           <span>Start NDI ved oppstart</span>
         </label>
+      </section>
+
+      <section className="card">
+        <h2 className="card__title">Visning</h2>
+        <label className="field">
+          <span className="field__label">Modus</span>
+          <select
+            className="field__input"
+            value={config.mode}
+            onChange={(e) => apply({ mode: e.target.value })}
+          >
+            <option value="studio">Studio — skjult, styres herfra</option>
+            <option value="presenter">Presenter — synlig vindu</option>
+          </select>
+        </label>
+        {presenter && (
+          <button
+            className="btn"
+            onClick={() => apply({ presenterFullscreen: !state.presenterFullscreen })}
+          >
+            {state.presenterFullscreen ? 'Avslutt fullskjerm' : 'Fullskjerm (F11)'}
+          </button>
+        )}
+        <p className="card__note">
+          {presenter
+            ? 'Presentereren bruker nettsiden direkte i det synlige vinduet — klikk, skjemaer, alt. NDI sender det samme bildet.'
+            : 'Siden rendres skjult i nøyaktig oppløsning; du styrer den via forhåndsvisningen.'}
+        </p>
       </section>
 
       <section className="card">
@@ -139,10 +168,11 @@ export function SettingsRail({ state }: { state: VevState }): React.JSX.Element 
             ))}
           </select>
         </label>
-        <label className="check">
+        <label className="check" title={presenter ? 'Bare tilgjengelig i studio-modus' : undefined}>
           <input
             type="checkbox"
             checked={config.transparent}
+            disabled={presenter}
             onChange={(e) => apply({ transparent: e.target.checked })}
           />
           <span>Transparent bakgrunn (alfa i NDI)</span>
@@ -156,8 +186,75 @@ export function SettingsRail({ state }: { state: VevState }): React.JSX.Element 
           <span>Spill lyd på denne maskinen</span>
         </label>
         <p className="card__note">
-          Bytte av transparent bakgrunn bygger nettleservinduet på nytt — siden lastes om.
+          {presenter
+            ? 'Transparent bakgrunn gjelder bare studio-modus (skjult vindu).'
+            : 'Bytte av transparent bakgrunn bygger nettleservinduet på nytt — siden lastes om.'}
         </p>
+      </section>
+
+      <section className="card">
+        <h2 className="card__title">Fjernstyring · Stream Deck</h2>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={config.httpEnabled}
+            onChange={(e) => apply({ httpEnabled: e.target.checked })}
+          />
+          <span>HTTP-API på</span>
+        </label>
+        {config.httpEnabled && (
+          <>
+            <div className="field field--row">
+              <span className="field__label" style={{ minWidth: 34 }}>
+                Port
+              </span>
+              <input
+                key={config.httpPort}
+                className="field__input field__input--num"
+                type="number"
+                min={1024}
+                max={65535}
+                defaultValue={config.httpPort}
+                onBlur={(e) => {
+                  const p = Number(e.target.value)
+                  if (Number.isInteger(p) && p >= 1024 && p <= 65535 && p !== config.httpPort) {
+                    apply({ httpPort: p })
+                  }
+                }}
+              />
+            </div>
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={config.httpLan}
+                onChange={(e) => apply({ httpLan: e.target.checked })}
+              />
+              <span>Tillat LAN (krever token)</span>
+            </label>
+            {config.httpLan && (
+              <label className="field">
+                <span className="field__label">Token</span>
+                <input
+                  key={config.httpToken}
+                  className="field__input"
+                  type="text"
+                  placeholder="hemmelig-token"
+                  defaultValue={config.httpToken}
+                  onBlur={(e) => {
+                    if (e.target.value !== config.httpToken) apply({ httpToken: e.target.value })
+                  }}
+                />
+              </label>
+            )}
+            {state.httpError && <div className="rail__error">{state.httpError}</div>}
+            <p className="card__note code-note">
+              GET /api/key?key=ArrowRight · /api/scroll?dy=600 · /api/go?url=… ·
+              /api/nav/back · /api/testcard · /api/presenter?fullscreen=1 · /api/status
+              <br />
+              http://127.0.0.1:{config.httpPort}/api/…
+            </p>
+          </>
+        )}
       </section>
 
       {error && <div className="rail__error">{error}</div>}

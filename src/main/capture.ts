@@ -1,9 +1,14 @@
 /**
- * VevCapture — the engine. Owns the offscreen content window and everything
- * that happens to its pixels:
+ * VevCapture — the engine. Owns the content window and everything that happens
+ * to its pixels, in one of two modes sharing the same downstream pipeline:
  *
- *   paint (BGRA NativeImage) ──► latest frame buffer ──► paced send loop ──► NdiSender
- *                            └─► time-gated preview (JPEG/PNG) ──► control UI
+ *   studio    — hidden OFFSCREEN window; 'paint' events deliver BGRA NativeImages.
+ *               Pixel-perfect at the configured resolution; operated via preview.
+ *   presenter — VISIBLE window (windowed/fullscreen) the presenter uses directly;
+ *               beginFrameSubscription delivers the same NativeImages live.
+ *
+ *   frames ──► latest BGRA buffer ──► drift-corrected send loop ──► NdiSender
+ *          └─► time-gated preview (JPEG/PNG) ──► control UI
  *
  * Also: navigation state, input injection, crash/hang/load-failure recovery.
  * The offscreen CPU path requires app.disableHardwareAcceleration() — done in index.ts.
@@ -24,6 +29,10 @@ const PREVIEW_JPEG_QUALITY = 65
 const STATS_INTERVAL_MS = 500
 const MAX_CRASH_RELOADS = 3
 const CRASH_BACKOFF_MS = [1000, 2000, 4000] as const
+/** Send loop runs on a small quantum with a float accumulator — a rounded
+ *  setInterval(33) would drift ~1% off the declared NDI frame rate. */
+const PACER_QUANTUM_MS = 4
+const PACER_RESYNC_MS = 500
 /** NDI frame_rate_N per fps (D is always 1000). */
 const FPS_N: Record<Fps, number> = { 25: 25000, 30: 30000, 50: 50000, 60: 60000 }
 /** did-fail-load gives ERR_ABORTED (-3) for cancelled loads — not a real failure. */
@@ -41,6 +50,7 @@ interface CaptureEvents {
   stats: [CaptureStats]
   preview: [Buffer, string]
   cursor: [string]
+  presenterClosed: []
 }
 
 export class VevCapture extends EventEmitter<CaptureEvents> {
@@ -50,17 +60,23 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
   private readonly pacer = new Pacer()
   private sendTimer: NodeJS.Timeout | null = null
   private statsTimer: NodeJS.Timeout | null = null
+  private presenterTimer: NodeJS.Timeout | null = null
+  private presenterCapturing = false
+  private presenterFirstFrame = false
+  private nextDueAt = 0
   private lastPreviewAt = 0
   private warnedScale = false
   private crashCount = 0
   private crashReloadTimer: NodeJS.Timeout | null = null
   private disposed = false
+  /** Guards the presenter window's 'closed' event during intentional rebuild/dispose. */
+  private tearingWindow = false
 
   /** What the URL bar shows and what reload retries — the *intended* target, never a file:// path. */
   private currentTarget: string = INTERNAL_TESTCARD
   private failure: NavState['failure'] = null
   private unresponsive = false
-  private static permissionsWired = false
+  private static sessionWired = false
 
   constructor(
     private readonly sender: NdiSender,
@@ -80,26 +96,41 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
     if (this.win) return
     this.createWindow()
     this.startLoops()
-    this.navigate(this.cfg.url)
+    const r = this.navigate(this.cfg.url)
+    if (!r.ok) {
+      // A corrupt persisted URL must never yield silent black output.
+      console.warn(`[capture] lagret adresse avvist (${r.error}) — laster testkortet`)
+      this.loadTarget(INTERNAL_TESTCARD)
+    }
   }
 
   private createWindow(): void {
     const ses = session.fromPartition(PARTITION)
-    if (!VevCapture.permissionsWired) {
-      VevCapture.permissionsWired = true
-      // The content window renders arbitrary remote pages: deny every permission prompt.
+    if (!VevCapture.sessionWired) {
+      VevCapture.sessionWired = true
+      // The content window renders arbitrary remote pages: deny every permission
+      // prompt AND every silent permission check, and block downloads outright.
       ses.setPermissionRequestHandler((_wc, _permission, callback) => callback(false))
+      ses.setPermissionCheckHandler(() => false)
+      ses.on('will-download', (event) => event.preventDefault())
     }
 
+    const presenter = this.cfg.mode === 'presenter'
     const win = new BrowserWindow({
-      show: false,
+      show: presenter,
       width: this.cfg.width,
       height: this.cfg.height,
       useContentSize: true,
-      transparent: this.cfg.transparent,
-      frame: false,
+      resizable: false,
+      fullscreenable: true,
+      autoHideMenuBar: true,
+      title: 'VEV — presenter',
+      backgroundColor: presenter ? '#0C1116' : undefined,
+      // transparent only exists offscreen; a visible transparent window makes no sense here
+      transparent: !presenter && this.cfg.transparent,
+      frame: presenter,
       webPreferences: {
-        offscreen: true,
+        offscreen: !presenter,
         sandbox: true,
         contextIsolation: true,
         nodeIntegration: false,
@@ -109,39 +140,32 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
     })
     this.win = win
     const contents = win.webContents
-    contents.setFrameRate(this.cfg.fps)
+    if (!presenter) contents.setFrameRate(this.cfg.fps)
     contents.setAudioMuted(!this.cfg.localAudio)
 
-    contents.on('paint', (_event, _dirty, image) => {
-      if (this.disposed) return
-      let img = image
-      const size = image.getSize()
-      if (size.width !== this.cfg.width || size.height !== this.cfg.height) {
-        if (!this.warnedScale) {
-          this.warnedScale = true
-          console.warn(
-            `[capture] paint ${size.width}x${size.height} != config ${this.cfg.width}x${this.cfg.height} — resizing (check force-device-scale-factor)`
-          )
+    if (presenter) {
+      win.setMenuBarVisibility(false)
+      if (this.cfg.presenterFullscreen) win.setFullScreen(true)
+      // F11 toggles fullscreen; Esc leaves it. Everything else flows to the page.
+      contents.on('before-input-event', (event, input) => {
+        if (input.type !== 'keyDown') return
+        if (input.key === 'F11') {
+          event.preventDefault()
+          win.setFullScreen(!win.isFullScreen())
+          this.pushNav()
+        } else if (input.key === 'Escape' && win.isFullScreen()) {
+          event.preventDefault()
+          win.setFullScreen(false)
+          this.pushNav()
         }
-        img = image.resize({ width: this.cfg.width, height: this.cfg.height })
-      }
-      this.latest = img.toBitmap() // BGRA copy; getBitmap()'s view is only valid this tick
-      this.pacer.onFrame(Date.now())
-
-      const now = Date.now()
-      if (now - this.lastPreviewAt >= PREVIEW_INTERVAL_MS) {
-        this.lastPreviewAt = now
-        try {
-          const small = img.resize({ width: PREVIEW_WIDTH })
-          if (this.cfg.transparent) this.emit('preview', small.toPNG(), 'image/png')
-          else this.emit('preview', small.toJPEG(PREVIEW_JPEG_QUALITY), 'image/jpeg')
-        } catch (e) {
-          console.error('[capture] preview encode:', (e as Error).message)
-        }
-      }
-    })
-
-    contents.on('cursor-changed', (_e, type) => this.emit('cursor', type))
+      })
+      win.on('closed', () => {
+        if (!this.tearingWindow && !this.disposed) this.emit('presenterClosed')
+      })
+    } else {
+      contents.on('paint', (_event, _dirty, image) => this.onFrameImage(image))
+      contents.on('cursor-changed', (_e, type) => this.emit('cursor', type))
+    }
 
     // ---- navigation state ----
     const push = (): void => this.pushNav()
@@ -166,6 +190,7 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
       if (this.disposed || details.reason === 'clean-exit') return
       this.crashCount += 1
       console.error(`[capture] renderer gone (${details.reason}), attempt ${this.crashCount}`)
+      this.clearCrashTimer()
       if (this.crashCount <= MAX_CRASH_RELOADS) {
         const delay = CRASH_BACKOFF_MS[this.crashCount - 1] ?? 4000
         this.crashReloadTimer = setTimeout(() => {
@@ -203,12 +228,87 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
     })
   }
 
+  /** Shared frame path for both modes. Must do all NativeImage work inside this tick. */
+  private onFrameImage(image: Electron.NativeImage): void {
+    if (this.disposed) return
+    let img = image
+    const size = image.getSize()
+    if (size.width !== this.cfg.width || size.height !== this.cfg.height) {
+      if (!this.warnedScale) {
+        this.warnedScale = true
+        console.warn(
+          `[capture] frame ${size.width}x${size.height} != config ${this.cfg.width}x${this.cfg.height} — resizing`
+        )
+      }
+      img = image.resize({ width: this.cfg.width, height: this.cfg.height })
+    }
+    this.latest = img.toBitmap() // BGRA copy; the source buffer is only valid this tick
+    this.pacer.onFrame(Date.now())
+
+    const now = Date.now()
+    if (now - this.lastPreviewAt >= PREVIEW_INTERVAL_MS) {
+      this.lastPreviewAt = now
+      try {
+        const small = img.resize({ width: PREVIEW_WIDTH })
+        if (this.cfg.transparent && this.cfg.mode === 'studio') {
+          this.emit('preview', small.toPNG(), 'image/png')
+        } else {
+          this.emit('preview', small.toJPEG(PREVIEW_JPEG_QUALITY), 'image/jpeg')
+        }
+      } catch (e) {
+        console.error('[capture] preview encode:', (e as Error).message)
+      }
+    }
+  }
+
+  /**
+   * Presenter frame source: paced capturePage() polling. beginFrameSubscription
+   * never fires for onscreen windows in this Electron/compositor combination
+   * (verified empirically, both with and without GPU compositing) — capturePage
+   * is the API that demonstrably works here. Reentrancy-guarded; empty captures
+   * (minimized window) are skipped and frame repetition carries the NDI feed.
+   */
+  private startPresenterCapture(): void {
+    const intervalMs = Math.max(16, Math.round(1000 / this.cfg.fps))
+    this.presenterTimer = setInterval(() => {
+      if (this.presenterCapturing || this.disposed) return
+      const contents = this.contents
+      if (!contents) return
+      this.presenterCapturing = true
+      contents
+        .capturePage()
+        .then((image) => {
+          const size = image.getSize()
+          if (size.width > 1 && size.height > 1) {
+            if (!this.presenterFirstFrame) {
+              this.presenterFirstFrame = true
+              console.log(`[capture] presenter frames flowing (${size.width}x${size.height})`)
+            }
+            this.onFrameImage(image)
+          }
+        })
+        .catch(() => {
+          /* window mid-teardown — repetition keeps NDI fed */
+        })
+        .finally(() => {
+          this.presenterCapturing = false
+        })
+    }, intervalMs)
+  }
+
   private startLoops(): void {
     this.stopLoops()
-    const intervalMs = Math.max(4, Math.round(1000 / this.cfg.fps))
+    if (this.cfg.mode === 'presenter' && this.win) this.startPresenterCapture()
+    const frameMs = 1000 / this.cfg.fps
+    this.nextDueAt = Date.now() + frameMs
     this.sendTimer = setInterval(() => {
+      const now = Date.now()
+      if (now < this.nextDueAt) return
+      this.nextDueAt += frameMs
+      // Fell far behind (system sleep, long GC): resync instead of burst-sending.
+      if (now - this.nextDueAt > PACER_RESYNC_MS) this.nextDueAt = now + frameMs
       if (!this.latest || !this.sender.isLive()) return
-      const decision = this.pacer.onTick(Date.now())
+      const decision = this.pacer.onTick(now)
       if (decision.send) {
         this.sender.sendFrame(
           this.latest,
@@ -218,7 +318,7 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
           1000
         )
       }
-    }, intervalMs)
+    }, PACER_QUANTUM_MS)
     this.statsTimer = setInterval(() => {
       const stats = this.pacer.stats(Date.now())
       this.emit('stats', { ...stats, receivers: this.sender.connections() })
@@ -228,8 +328,16 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
   private stopLoops(): void {
     if (this.sendTimer) clearInterval(this.sendTimer)
     if (this.statsTimer) clearInterval(this.statsTimer)
+    if (this.presenterTimer) clearInterval(this.presenterTimer)
     this.sendTimer = null
     this.statsTimer = null
+    this.presenterTimer = null
+    this.presenterFirstFrame = false
+  }
+
+  private clearCrashTimer(): void {
+    if (this.crashReloadTimer) clearTimeout(this.crashReloadTimer)
+    this.crashReloadTimer = null
   }
 
   // ---------- navigation ----------
@@ -246,6 +354,8 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
   private loadTarget(url: string): void {
     const contents = this.contents
     if (!contents) return
+    // A pending crash-recovery reload must not fire on top of a fresh navigation.
+    this.clearCrashTimer()
     this.currentTarget = url
     if (url === INTERNAL_TESTCARD) {
       void contents
@@ -346,8 +456,10 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
     this.cfg = { ...next }
     if (!this.win) return false
 
-    if (next.transparent !== prev.transparent) {
-      // `transparent` is immutable per-window: rebuild and restore the target.
+    const modeChanged = next.mode !== prev.mode
+    const transparentChanged = next.transparent !== prev.transparent && next.mode === 'studio'
+    if (modeChanged || transparentChanged) {
+      // mode and `transparent` are immutable per-window: rebuild and restore the target.
       const target = this.currentTarget
       this.rebuildWindow()
       this.loadTarget(target)
@@ -357,14 +469,17 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
       this.warnedScale = false
       this.latest = null // old-size frames must not reach NDI with the new dimensions
       this.win.setContentSize(next.width, next.height)
-      this.contents?.invalidate()
+      if (next.mode === 'studio') this.contents?.invalidate()
     }
     if (next.fps !== prev.fps) {
-      this.contents?.setFrameRate(next.fps)
+      if (next.mode === 'studio') this.contents?.setFrameRate(next.fps)
       this.startLoops()
     }
     if (next.localAudio !== prev.localAudio) {
       this.contents?.setAudioMuted(!next.localAudio)
+    }
+    if (next.presenterFullscreen !== prev.presenterFullscreen && next.mode === 'presenter') {
+      this.win.setFullScreen(next.presenterFullscreen)
     }
     if (next.ndiName !== prev.ndiName && this.currentTarget === INTERNAL_TESTCARD) {
       this.loadTarget(INTERNAL_TESTCARD) // testcard displays the NDI name — refresh it
@@ -372,14 +487,26 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
     return false
   }
 
+  isPresenterFullscreen(): boolean {
+    return this.cfg.mode === 'presenter' && !!this.win && !this.win.isDestroyed() && this.win.isFullScreen()
+  }
+
   private rebuildWindow(): void {
+    this.clearCrashTimer()
     const old = this.win
     this.win = null
     this.latest = null
     this.pacer.reset()
-    if (old && !old.isDestroyed()) old.destroy()
+    this.teardownWindow(old)
     this.createWindow()
     this.startLoops()
+  }
+
+  private teardownWindow(win: BrowserWindow | null): void {
+    if (!win || win.isDestroyed()) return
+    this.tearingWindow = true
+    win.destroy()
+    this.tearingWindow = false
   }
 
   getConfig(): VevConfig {
@@ -407,9 +534,8 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
     if (this.disposed) return
     this.disposed = true
     this.stopLoops()
-    if (this.crashReloadTimer) clearTimeout(this.crashReloadTimer)
-    this.crashReloadTimer = null
-    if (this.win && !this.win.isDestroyed()) this.win.destroy()
+    this.clearCrashTimer()
+    this.teardownWindow(this.win)
     this.win = null
     this.latest = null
   }
