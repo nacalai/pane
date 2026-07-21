@@ -95,7 +95,8 @@ export function routeCommand(pathname: string, q: URLSearchParams): RouteResult 
     case '/api/ndi/stop':
       return { ok: true, cmd: { kind: 'ndi', on: false } }
 
-    case '/api/presenter': {
+    case '/api/presenter':
+    case '/api/presenter/open': {
       const fs = q.get('fullscreen')
       if (fs !== null && fs !== '0' && fs !== '1') return bad('fullscreen må være 0 eller 1')
       return {
@@ -103,7 +104,9 @@ export function routeCommand(pathname: string, q: URLSearchParams): RouteResult 
         cmd: { kind: 'mode', mode: 'presenter', ...(fs !== null ? { fullscreen: fs === '1' } : {}) }
       }
     }
+    // "Close" the presenter view = back to hidden studio mode; NDI keeps streaming the page.
     case '/api/studio':
+    case '/api/presenter/close':
       return { ok: true, cmd: { kind: 'mode', mode: 'studio' } }
 
     default:

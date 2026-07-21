@@ -76,6 +76,14 @@ describe('routeCommand', () => {
       ok: true,
       cmd: { kind: 'mode', mode: 'studio' }
     })
+    expect(routeCommand('/api/presenter/open', q('fullscreen=1'))).toEqual({
+      ok: true,
+      cmd: { kind: 'mode', mode: 'presenter', fullscreen: true }
+    })
+    expect(routeCommand('/api/presenter/close', q())).toEqual({
+      ok: true,
+      cmd: { kind: 'mode', mode: 'studio' }
+    })
     expect(routeCommand('/api/presenter', q('fullscreen=x')).ok).toBe(false)
   })
 

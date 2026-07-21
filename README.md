@@ -52,8 +52,10 @@ GET /api/status                      full tilstand som JSON (for feedbacks)
 ```
 
 Stream Deck: «Web Requests»-plugin (BarRaider) → GET. Companion: Generic HTTP → GET.
-Eksterne maskiner: slå på «Tillat LAN», sett token, kall med `?token=…` eller
-`Authorization: Bearer …`.
+Eksterne maskiner: slå på «Tillat LAN», sett token, og send `Authorization: Bearer <token>`
+(query-token støttes ikke — lekker i logger). Sikkerhet: nettleser-utløste kall
+(Sec-Fetch-Site/Origin) avvises — en fiendtlig nettside i innholdsvinduet kan ikke
+fjernstyre sendingen — og Host-headeren pinnes mot DNS-rebinding.
 
 - **Testkort**-knappen legger et VAPOR-testkort med klokke på lufta — øyeblikkelig signal i vMix.
 - **Transparent bakgrunn** (studio) gir ekte alfa i NDI — HTML-grafikk keyes rett over program.

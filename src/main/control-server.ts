@@ -7,9 +7,9 @@
  */
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { routeCommand, type ControlCommand } from '@shared/control-routes'
+import { authorizeRequest } from './control-auth'
 
 const REQUEST_TIMEOUT_MS = 10_000
-const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1'])
 
 export interface HttpSettings {
   enabled: boolean
@@ -65,13 +65,21 @@ export class ControlServer {
     this.server = server
   }
 
-  private authorized(req: IncomingMessage, url: URL): boolean {
-    const remote = req.socket.remoteAddress ?? ''
-    if (LOOPBACK.has(remote)) return true
+  private authorized(req: IncomingMessage): { ok: true } | { ok: false; reason: string } {
     const cfg = this.current
-    if (!cfg || !cfg.lan || !cfg.token) return false
-    const bearer = (req.headers.authorization ?? '').replace(/^Bearer\s+/i, '')
-    return bearer === cfg.token || url.searchParams.get('token') === cfg.token
+    return authorizeRequest({
+      remoteAddress: req.socket.remoteAddress ?? '',
+      hostHeader: req.headers.host ?? '',
+      originHeader: typeof req.headers.origin === 'string' ? req.headers.origin : undefined,
+      secFetchSite:
+        typeof req.headers['sec-fetch-site'] === 'string'
+          ? req.headers['sec-fetch-site']
+          : undefined,
+      authorizationHeader: req.headers.authorization,
+      port: cfg?.port ?? 0,
+      lan: cfg?.lan ?? false,
+      token: cfg?.token ?? ''
+    })
   }
 
   private handle(req: IncomingMessage, res: ServerResponse): void {
@@ -86,8 +94,9 @@ export class ControlServer {
         return
       }
       const url = new URL(req.url ?? '/', 'http://vev.local')
-      if (!this.authorized(req, url)) {
-        send(403, { ok: false, error: 'ikke autorisert (LAN + token kreves for eksterne kall)' })
+      const auth = this.authorized(req)
+      if (!auth.ok) {
+        send(403, { ok: false, error: `ikke autorisert: ${auth.reason}` })
         return
       }
       const routed = routeCommand(url.pathname, url.searchParams)
