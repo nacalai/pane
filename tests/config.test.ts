@@ -37,6 +37,26 @@ describe('ConfigStore', () => {
     expect(store.load()).toEqual(cfg)
   })
 
+  it('persists the NDI source name and all settings across a reload', () => {
+    const store = new ConfigStore(dir)
+    const cfg = {
+      ...DEFAULT_CONFIG,
+      ndiName: 'Studio 1 Nyheter',
+      mode: 'presenter' as const,
+      presenterFullscreen: true,
+      httpPort: 9400,
+      httpLan: true,
+      httpToken: 'hemmelig',
+      launchAtLogin: true,
+      startMinimized: true
+    }
+    store.save(cfg)
+    // A fresh store instance (simulating an app restart) must see every value.
+    const reloaded = new ConfigStore(dir).load()
+    expect(reloaded.ndiName).toBe('Studio 1 Nyheter')
+    expect(reloaded).toEqual(cfg)
+  })
+
   it('leaves no tmp file behind after save', () => {
     const store = new ConfigStore(dir)
     store.save(DEFAULT_CONFIG)

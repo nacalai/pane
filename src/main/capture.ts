@@ -240,6 +240,16 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
   /** Shared frame path for both modes. Must do all NativeImage work inside this tick. */
   private onFrameImage(image: Electron.NativeImage): void {
     if (this.disposed) return
+    try {
+      this.processFrame(image)
+    } catch (e) {
+      // A single malformed frame must never propagate to Electron and kill the process —
+      // repetition of the last good frame keeps the NDI feed alive.
+      console.error('[capture] frame drop:', (e as Error).message)
+    }
+  }
+
+  private processFrame(image: Electron.NativeImage): void {
     let img = image
     const size = image.getSize()
     if (size.width !== this.cfg.width || size.height !== this.cfg.height) {
@@ -311,26 +321,29 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
     const frameMs = 1000 / this.cfg.fps
     this.nextDueAt = Date.now() + frameMs
     this.sendTimer = setInterval(() => {
-      const now = Date.now()
-      if (now < this.nextDueAt) return
-      this.nextDueAt += frameMs
-      // Fell far behind (system sleep, long GC): resync instead of burst-sending.
-      if (now - this.nextDueAt > PACER_RESYNC_MS) this.nextDueAt = now + frameMs
-      if (!this.latest || !this.sender.isLive()) return
-      const decision = this.pacer.onTick(now)
-      if (decision.send) {
-        this.sender.sendFrame(
-          this.latest,
-          this.cfg.width,
-          this.cfg.height,
-          FPS_N[this.cfg.fps],
-          1000
-        )
+      try {
+        const now = Date.now()
+        if (now < this.nextDueAt) return
+        this.nextDueAt += frameMs
+        // Fell far behind (system sleep, long GC): resync instead of burst-sending.
+        if (now - this.nextDueAt > PACER_RESYNC_MS) this.nextDueAt = now + frameMs
+        if (!this.latest || !this.sender.isLive()) return
+        const decision = this.pacer.onTick(now)
+        if (decision.send) {
+          this.sender.sendFrame(this.latest, this.cfg.width, this.cfg.height, FPS_N[this.cfg.fps], 1000)
+        }
+      } catch (e) {
+        // One bad tick must not kill the loop or the process — the next tick recovers.
+        console.error('[capture] send tick:', (e as Error).message)
       }
     }, PACER_QUANTUM_MS)
     this.statsTimer = setInterval(() => {
-      const stats = this.pacer.stats(Date.now())
-      this.emit('stats', { ...stats, receivers: this.sender.connections() })
+      try {
+        const stats = this.pacer.stats(Date.now())
+        this.emit('stats', { ...stats, receivers: this.sender.connections() })
+      } catch (e) {
+        console.error('[capture] stats tick:', (e as Error).message)
+      }
     }, STATS_INTERVAL_MS)
   }
 

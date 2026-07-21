@@ -14,7 +14,11 @@ import { registerIpc } from './ipc'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-// Stable identity so Windows treats every launch (and the installer) as one app.
+// Stable identity so Windows treats every launch (and the installer) as one app,
+// AND so userData (persisted config) resolves to the SAME folder in every launch mode.
+// Without setName, a direct/dev launch falls back to "Electron" and settings would appear
+// to not persist because they'd land in a different directory than the packaged app.
+app.setName('VEV')
 app.setAppUserModelId('no.creavid.vev')
 
 let tray: Tray | null = null
@@ -77,16 +81,16 @@ function teardown(): void {
   }
 }
 
-// Crash backstops: hardware-adjacent teardown must run on EVERY exit path.
+// On-air-safe backstops: VEV is a live NDI source. A stray rejection/exception must NOT
+// take the feed off air, so we log LOUDLY and keep running rather than exit — the frame
+// loop, NDI sender, IPC handlers and loaders all fail closed on their own. (Truly fatal
+// native faults still crash the process; nothing in JS can prevent those.) Real teardown
+// happens only on deliberate quit (before-quit).
 process.on('uncaughtException', (err) => {
-  console.error('[main] uncaughtException:', err)
-  teardown()
-  app.exit(1)
+  console.error('[main] uncaughtException (holder VEV i live):', err)
 })
 process.on('unhandledRejection', (reason) => {
-  console.error('[main] unhandledRejection:', reason)
-  teardown()
-  app.exit(1)
+  console.error('[main] unhandledRejection (holder VEV i live):', reason)
 })
 
 if (!app.requestSingleInstanceLock()) {
@@ -264,6 +268,19 @@ function runSelfcheck(control: BrowserWindow): void {
       framesAtCrash = vev.state().framesSent
       console.log(`[selfcheck] crashing content renderer at ${framesAtCrash} frames`)
       vev.capture.crashForTest()
+    }, SELFCHECK_CRASH_AT_MS)
+  }
+
+  // Prove the on-air backstops keep VEV alive: a stray uncaughtException + unhandledRejection
+  // must NOT take the app down. The run still PASSes (frames keep flowing) → app stayed live.
+  if (process.env.VEV_SELFCHECK_THROW === '1') {
+    setTimeout(() => {
+      framesAtCrash = vev?.state().framesSent ?? 0
+      console.log(`[selfcheck] injecting synthetic faults at ${framesAtCrash} frames`)
+      void Promise.reject(new Error('selfcheck synthetic unhandledRejection'))
+      setTimeout(() => {
+        throw new Error('selfcheck synthetic uncaughtException')
+      }, 50)
     }, SELFCHECK_CRASH_AT_MS)
   }
 
