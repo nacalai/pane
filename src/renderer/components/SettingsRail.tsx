@@ -232,6 +232,14 @@ export function SettingsRail({ state }: { state: VevState }): React.JSX.Element 
           />
           <span>Spill lyd på denne maskinen</span>
         </label>
+        <label className="check" title="Legger nesten usynlig støy på siden for å bryte opp striper i graderinger">
+          <input
+            type="checkbox"
+            checked={config.dither}
+            onChange={(e) => apply({ dither: e.target.checked })}
+          />
+          <span>Reduser striper i graderinger (dither)</span>
+        </label>
         <p className="card__note">
           {presenter
             ? 'Transparent bakgrunn gjelder bare studio-modus (skjult vindu).'

@@ -32,6 +32,7 @@ export interface VevConfig {
   transparent: boolean
   localAudio: boolean
   autoStart: boolean
+  dither: boolean
   mode: VevMode
   presenterFullscreen: boolean
   presenterDisplayId: number
@@ -54,6 +55,7 @@ export const DEFAULT_CONFIG: VevConfig = {
   transparent: false,
   localAudio: false,
   autoStart: true,
+  dither: false,
   mode: 'studio',
   presenterFullscreen: false,
   presenterDisplayId: 0,
@@ -78,6 +80,7 @@ export const SettingsPatchSchema = z
     transparent: z.boolean(),
     localAudio: z.boolean(),
     autoStart: z.boolean(),
+    dither: z.boolean(),
     mode: z.enum(['studio', 'presenter']),
     presenterFullscreen: z.boolean(),
     // 0 = follow primary display; otherwise an Electron display id.

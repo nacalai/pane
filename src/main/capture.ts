@@ -38,6 +38,23 @@ const FPS_N: Record<Fps, number> = { 25: 25000, 30: 30000, 50: 50000, 60: 60000 
 /** did-fail-load gives ERR_ABORTED (-3) for cancelled loads — not a real failure. */
 const ERR_ABORTED = -3
 
+/**
+ * Near-invisible fractal-noise overlay injected into the page to dither 8-bit gradients so
+ * they don't band through NDI's 4:2:2. GPU-composited (no per-frame CPU), pointer-events:none
+ * so it never blocks clicks. Tuned subtle — invisible on text, enough to break gradient bands.
+ */
+const DITHER_NOISE_SVG =
+  "<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'>" +
+  "<filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter>" +
+  "<rect width='160' height='160' filter='url(#n)'/></svg>"
+// Plain alpha-over (NO mix-blend-mode) — a blend mode forces a per-pixel backdrop read that
+// tanks frame rate on heavy pages. A faint translucent noise layer is cheap and still dithers.
+const DITHER_CSS =
+  'html::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:2147483647;' +
+  'opacity:0.05;background-size:150px 150px;background-image:url("data:image/svg+xml,' +
+  encodeURIComponent(DITHER_NOISE_SVG) +
+  '")}'
+
 export interface CaptureStats {
   sentFps: number
   framesSent: number
@@ -69,6 +86,7 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
   private crashCount = 0
   private crashReloadTimer: NodeJS.Timeout | null = null
   private disposed = false
+  private ditherKey: string | null = null
   /** Guards the presenter window's 'closed' event during intentional rebuild/dispose. */
   private tearingWindow = false
 
@@ -176,6 +194,8 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
     contents.on('page-title-updated', push)
     contents.on('did-finish-load', () => {
       this.crashCount = 0
+      this.ditherKey = null // insertCSS is cleared on navigation; re-apply for the new document
+      this.applyDither()
       this.pushNav()
     })
 
@@ -502,6 +522,10 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
     if (next.localAudio !== prev.localAudio) {
       this.contents?.setAudioMuted(!next.localAudio)
     }
+    if (next.dither !== prev.dither) {
+      if (next.dither) this.applyDither()
+      else this.removeDither()
+    }
     if (
       next.mode === 'presenter' &&
       (next.presenterFullscreen !== prev.presenterFullscreen ||
@@ -554,6 +578,29 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
         y: wa.y + Math.max(0, Math.round((wa.height - wb.height) / 2)),
         width: wb.width,
         height: wb.height
+      })
+    }
+  }
+
+  /** Inject the dither overlay into the current document (idempotent). */
+  private applyDither(): void {
+    const contents = this.contents
+    if (!contents || !this.cfg.dither || this.ditherKey) return
+    contents
+      .insertCSS(DITHER_CSS)
+      .then((key) => {
+        this.ditherKey = key
+      })
+      .catch((e: unknown) => console.error('[capture] dither insertCSS:', (e as Error).message))
+  }
+
+  private removeDither(): void {
+    const contents = this.contents
+    const key = this.ditherKey
+    this.ditherKey = null
+    if (contents && key) {
+      contents.removeInsertedCSS(key).catch(() => {
+        /* page may have navigated away — the CSS is already gone */
       })
     }
   }
