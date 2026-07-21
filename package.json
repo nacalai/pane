@@ -8,9 +8,29 @@
     "dev": "electron-vite dev",
     "start": "electron-vite preview",
     "build": "electron-vite build",
+    "dist": "electron-vite build && electron-builder --win --publish never",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "lint": "eslint ."
+  },
+  "build": {
+    "appId": "no.creavid.vev",
+    "productName": "VEV",
+    "directories": { "output": "release", "buildResources": "build" },
+    "files": ["out/**/*", "resources/**/*", "package.json"],
+    "asarUnpack": ["node_modules/koffi/**"],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "VEV"
+    }
   },
   "dependencies": {
     "koffi": "^3.1.2"
@@ -21,6 +41,7 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^5.2.0",
     "electron": "^43.2.0",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
     "eslint": "^10.7.0",
     "react": "^18.3.0",

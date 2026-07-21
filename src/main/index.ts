@@ -4,8 +4,8 @@
  * Offscreen rendering (CPU path) requires hardware acceleration OFF and a
  * forced 1x device scale so paint buffers match the configured resolution.
  */
-import { app, BrowserWindow } from 'electron'
-import { writeFileSync } from 'node:fs'
+import { app, BrowserWindow, Menu, nativeImage, Tray } from 'electron'
+import { existsSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ConfigStore } from './config'
@@ -14,6 +14,43 @@ import { registerIpc } from './ipc'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
+// Stable identity so Windows treats every launch (and the installer) as one app.
+app.setAppUserModelId('no.creavid.vev')
+
+let tray: Tray | null = null
+/** True once the user really wants to quit — the X button only hides to tray. */
+let isQuitting = false
+
+/** Marker arg the login-item launch adds so a boot start comes up hidden to tray. */
+const HIDDEN_FLAG = '--hidden'
+
+/**
+ * Register/unregister VEV as a Windows login item. Only meaningful when packaged
+ * (in dev the exe is electron.exe and we must not pollute the machine's startup).
+ * openAtLogin + a --hidden arg → boots straight to the tray.
+ */
+function syncLoginItem(enabled: boolean): void {
+  if (!app.isPackaged) return
+  app.setLoginItemSettings({ openAtLogin: enabled, args: [HIDDEN_FLAG] })
+}
+
+/**
+ * Locate resources/ across every launch mode: electron-vite preview + packaged asar
+ * (app.getAppPath()/resources), and a direct launch of the built output where
+ * getAppPath() resolves to out/main (…/out/main → project-root/resources). Picking the
+ * dir that actually contains testcard.html keeps the offscreen page from failing to load.
+ */
+function resolveResourcesDir(): string {
+  const fallback = join(app.getAppPath(), 'resources')
+  const candidates = [
+    fallback,
+    join(__dirname, 'resources'),
+    join(__dirname, '..', '..', 'resources'),
+    join(process.cwd(), 'resources')
+  ]
+  return candidates.find((d) => existsSync(join(d, 'testcard.html'))) ?? fallback
+}
+
 // GPU compositing stays ON by default — measured on this machine: studio OSR 30 fps,
 // presenter capturePage 30 fps (software rendering dropped presenter to ~21 fps).
 // VEV_SWRENDER=1 falls back to software rendering if a GPU/driver misbehaves.
@@ -21,6 +58,8 @@ if (process.env.VEV_SWRENDER === '1') app.disableHardwareAcceleration()
 app.commandLine.appendSwitch('force-device-scale-factor', '1')
 
 const SELFCHECK = process.env.VEV_SELFCHECK === '1'
+/** Tray/close-to-tray behavior test — enables the tray + close handler under selfcheck. */
+const SELFCHECK_TRAY = process.env.VEV_SELFCHECK_TRAY === '1'
 const SELFCHECK_MS = Number(process.env.VEV_SELFCHECK_MS) > 0 ? Number(process.env.VEV_SELFCHECK_MS) : 20_000
 const SELFCHECK_CRASH_AT_MS = 8_000
 const SELFCHECK_MIN_FRAMES = 300
@@ -59,9 +98,17 @@ if (!app.requestSingleInstanceLock()) {
     const store = new ConfigStore(
       SELFCHECK ? join(app.getPath('temp'), 'vev-selfcheck-config') : app.getPath('userData')
     )
-    const resourcesDir = join(app.getAppPath(), 'resources')
+    const resourcesDir = resolveResourcesDir()
+    console.log('[main] resources:', resourcesDir)
     vev = new VevApp(store, resourcesDir)
     vev.initNdiRuntime()
+
+    // Start hidden when launched at boot (--hidden) or when the user set start-minimized.
+    // (Under selfcheck this is normally forced off for determinism, but the tray selfcheck
+    // opts back in so the hidden-startup path can be verified.)
+    const startHidden =
+      (!SELFCHECK || SELFCHECK_TRAY) &&
+      (process.argv.includes(HIDDEN_FLAG) || vev.state().config.startMinimized)
 
     const control = new BrowserWindow({
       width: 1280,
@@ -70,6 +117,7 @@ if (!app.requestSingleInstanceLock()) {
       minHeight: 700,
       title: 'VEV — Creavid',
       backgroundColor: '#FAFBFC',
+      show: false, // shown explicitly below unless starting hidden to tray
       webPreferences: {
         preload: join(__dirname, '../preload/index.cjs'),
         sandbox: true,
@@ -79,23 +127,37 @@ if (!app.requestSingleInstanceLock()) {
       }
     })
     control.setMenuBarVisibility(false)
+    control.once('ready-to-show', () => {
+      if (!startHidden) control.show()
+    })
+    // Keep the OS login item in sync with saved config on every launch.
+    syncLoginItem(vev.state().config.launchAtLogin)
+    vev.onLoginItemChange((cfg) => syncLoginItem(cfg.launchAtLogin))
     control.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
     control.webContents.on('will-navigate', (event) => event.preventDefault())
 
-    // The hidden capture window keeps 'window-all-closed' from ever firing —
-    // without this, closing the control window leaves a headless process
-    // streaming NDI while the single-instance lock bricks relaunch.
-    control.on('closed', () => {
-      teardown()
-      app.quit()
+    // The X button never quits — it hides the control UI to the tray while NDI
+    // keeps streaming. Quitting is deliberate, only from the tray menu (which
+    // sets isQuitting) or selfcheck. This is the tray-app counterpart to the
+    // earlier zombie fix: the window can be hidden, but the tray makes it
+    // visible and gives an explicit way to close.
+    control.on('close', (event) => {
+      if (isQuitting || (SELFCHECK && !SELFCHECK_TRAY)) return
+      event.preventDefault()
+      control.hide()
     })
-    app.on('second-instance', () => {
-      if (!control.isDestroyed()) {
-        if (control.isMinimized()) control.restore()
-        control.show()
-        control.focus()
-      }
-    })
+
+    const showControl = (): void => {
+      if (control.isDestroyed()) return
+      if (control.isMinimized()) control.restore()
+      control.show()
+      control.focus()
+    }
+
+    // Second launch attempt → surface the existing instance instead of starting a new one.
+    app.on('second-instance', showControl)
+
+    if (!SELFCHECK || SELFCHECK_TRAY) tray = createTray(showControl, resourcesDir)
 
     vev.attachControl(control)
     registerIpc(vev)
@@ -126,10 +188,52 @@ if (!app.requestSingleInstanceLock()) {
   })
 }
 
-app.on('before-quit', teardown)
-app.on('window-all-closed', () => {
-  app.quit()
+app.on('before-quit', () => {
+  isQuitting = true
+  teardown()
+  if (tray) {
+    tray.destroy()
+    tray = null
+  }
 })
+// Tray keeps the app alive while the control window is hidden — do NOT quit here.
+// Quitting is explicit (tray menu / selfcheck), so a hidden window never ends the app.
+app.on('window-all-closed', () => {
+  if (isQuitting || SELFCHECK) app.quit()
+})
+
+/** System-tray icon: click to show, right-click for a menu whose only exit is Avslutt. */
+function createTray(showControl: () => void, resourcesDir: string): Tray {
+  const iconPath = join(resourcesDir, 'icon.png')
+  const image = existsSync(iconPath)
+    ? nativeImage.createFromPath(iconPath).resize({ width: 32, height: 32 })
+    : nativeImage.createEmpty()
+  const t = new Tray(image)
+  t.setToolTip('VEV — nettside → NDI')
+  const rebuildMenu = (): void => {
+    const live = vev?.state().ndi === 'live'
+    t.setContextMenu(
+      Menu.buildFromTemplate([
+        { label: live ? '● NDI på lufta' : 'NDI av', enabled: false },
+        { type: 'separator' },
+        { label: 'Åpne VEV', click: showControl },
+        { type: 'separator' },
+        {
+          label: 'Avslutt VEV',
+          click: () => {
+            isQuitting = true
+            app.quit()
+          }
+        }
+      ])
+    )
+  }
+  rebuildMenu()
+  // Refresh the on-air label whenever the menu is about to open.
+  t.on('click', showControl)
+  t.on('right-click', rebuildMenu)
+  return t
+}
 
 /**
  * VEV_SELFCHECK=1: autonomous smoke — run 20 s on the testcard (or VEV_SELFCHECK_URL),
@@ -140,6 +244,19 @@ app.on('window-all-closed', () => {
 function runSelfcheck(control: BrowserWindow): void {
   const dir = process.env.VEV_SELFCHECK_DIR || process.cwd()
   let framesAtCrash: number | null = null
+  const tray_test:
+    | { closeHiddenNotDestroyed: boolean; trayPresent: boolean; startedHidden: boolean }
+    | null = SELFCHECK_TRAY
+    ? { closeHiddenNotDestroyed: false, trayPresent: false, startedHidden: false }
+    : null
+
+  if (SELFCHECK_TRAY && tray_test) {
+    // Record whether the window came up hidden (--hidden / startMinimized path).
+    setTimeout(() => {
+      tray_test.startedHidden = !control.isVisible()
+      console.log(`[selfcheck] initial visible=${control.isVisible()}`)
+    }, 2000)
+  }
 
   if (process.env.VEV_SELFCHECK_CRASH === '1') {
     setTimeout(() => {
@@ -147,6 +264,20 @@ function runSelfcheck(control: BrowserWindow): void {
       framesAtCrash = vev.state().framesSent
       console.log(`[selfcheck] crashing content renderer at ${framesAtCrash} frames`)
       vev.capture.crashForTest()
+    }, SELFCHECK_CRASH_AT_MS)
+  }
+
+  if (SELFCHECK_TRAY && tray_test) {
+    setTimeout(() => {
+      // Simulate the user pressing X: the window must hide (not destroy), app stays alive.
+      control.close()
+      setTimeout(() => {
+        tray_test.closeHiddenNotDestroyed = !control.isDestroyed() && !control.isVisible()
+        tray_test.trayPresent = tray !== null
+        console.log(
+          `[selfcheck] after X: destroyed=${control.isDestroyed()} visible=${control.isVisible()} tray=${tray !== null}`
+        )
+      }, 500)
     }, SELFCHECK_CRASH_AT_MS)
   }
 
@@ -165,19 +296,24 @@ function runSelfcheck(control: BrowserWindow): void {
         url: st.nav.url,
         title: st.nav.title,
         sources: vev.sender.findSources(),
-        recovered: framesAtCrash === null ? null : st.framesSent > framesAtCrash + 30
+        recovered: framesAtCrash === null ? null : st.framesSent > framesAtCrash + 30,
+        tray: tray_test
       }
       writeFileSync(join(dir, 'selfcheck.json'), JSON.stringify(result, null, 2))
-      try {
-        const shot = await control.webContents.capturePage()
-        writeFileSync(join(dir, 'selfcheck.png'), shot.toPNG())
-      } catch (e) {
-        console.error('[selfcheck] screenshot:', e)
+      if (!tray_test) {
+        try {
+          const shot = await control.webContents.capturePage()
+          writeFileSync(join(dir, 'selfcheck.png'), shot.toPNG())
+        } catch (e) {
+          console.error('[selfcheck] screenshot:', e)
+        }
       }
+      const trayOk = !tray_test || (tray_test.closeHiddenNotDestroyed && tray_test.trayPresent)
       const pass =
         result.ndi === 'live' &&
         result.framesSent > SELFCHECK_MIN_FRAMES &&
-        (result.recovered === null || result.recovered === true)
+        (result.recovered === null || result.recovered === true) &&
+        trayOk
       console.log(`[selfcheck] ${pass ? 'PASS' : 'FAIL'} — ${JSON.stringify(result)}`)
       teardown()
       app.exit(pass ? 0 : 1)

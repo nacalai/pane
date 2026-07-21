@@ -38,6 +38,8 @@ export interface VevConfig {
   httpPort: number
   httpLan: boolean
   httpToken: string
+  launchAtLogin: boolean
+  startMinimized: boolean
 }
 
 export const DEFAULT_HTTP_PORT = 9350
@@ -56,7 +58,9 @@ export const DEFAULT_CONFIG: VevConfig = {
   httpEnabled: true,
   httpPort: DEFAULT_HTTP_PORT,
   httpLan: false,
-  httpToken: ''
+  httpToken: '',
+  launchAtLogin: false,
+  startMinimized: false
 }
 
 const fpsSchema = z.union([z.literal(25), z.literal(30), z.literal(50), z.literal(60)])
@@ -77,7 +81,9 @@ export const SettingsPatchSchema = z
     httpEnabled: z.boolean(),
     httpPort: z.number().int().min(1024).max(65535),
     httpLan: z.boolean(),
-    httpToken: z.string().max(128)
+    httpToken: z.string().max(128),
+    launchAtLogin: z.boolean(),
+    startMinimized: z.boolean()
   })
   .partial()
 export type SettingsPatch = z.infer<typeof SettingsPatchSchema>

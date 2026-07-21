@@ -181,6 +181,15 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
 
     contents.on('did-fail-load', (_e, code, description, validatedURL, isMainFrame) => {
       if (!isMainFrame || code === ERR_ABORTED) return
+      // The errorcard ITSELF failed (e.g. resources missing/misdeployed). Never reload it —
+      // that recurses, nesting the failed URL into an ever-growing query string. Stop here;
+      // the control-UI banner still surfaces the failure.
+      if (validatedURL.includes('errorcard.html')) {
+        console.error('[capture] errorcard.html kunne ikke lastes — viser kun banner')
+        this.failure = { code, description: 'Ressursfil mangler (errorcard.html)', url: this.currentTarget }
+        this.pushNav()
+        return
+      }
       this.failure = { code, description, url: validatedURL || this.currentTarget }
       this.loadErrorCard()
       this.pushNav()

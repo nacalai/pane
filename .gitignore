@@ -5,3 +5,4 @@ dist/
 selfcheck.json
 selfcheck.png
 .env
+release/

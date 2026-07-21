@@ -95,6 +95,16 @@ describe('IPC schemas', () => {
     expect(parseConfig(undefined).httpPort).toBe(9350)
   })
 
+  it('validates and defaults the startup flags', () => {
+    expect(SettingsPatchSchema.safeParse({ launchAtLogin: true, startMinimized: true }).success).toBe(
+      true
+    )
+    expect(SettingsPatchSchema.safeParse({ launchAtLogin: 'yes' }).success).toBe(false)
+    expect(parseConfig(undefined).launchAtLogin).toBe(false)
+    expect(parseConfig(undefined).startMinimized).toBe(false)
+    expect(parseConfig({ launchAtLogin: true }).launchAtLogin).toBe(true)
+  })
+
   it('InputEvent validates each kind and rejects malformed events', () => {
     expect(
       InputEventSchema.safeParse({ kind: 'move', x: 0.5, y: 0.5, modifiers: [] }).success

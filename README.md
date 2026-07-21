@@ -15,7 +15,12 @@ FFI rett inn i `Processing.NDI.Lib.x64.dll` (ingen node-gyp, ingen forlatte addo
 npm install
 npm run dev       # utvikling
 npm start         # kjør bygget app (bygg først: npm run build)
+npm run dist      # bygg Windows-installer (NSIS) → release/
 ```
+
+**Installert app:** én instans totalt (andre oppstart henter frem det åpne vinduet).
+**X-knappen lukker aldri** — den minimerer til systemstatusfeltet der NDI fortsetter å
+sende. Høyreklikk tray-ikonet → «Avslutt VEV» for å faktisk lukke.
 
 Krav: [NDI Tools/Runtime](https://ndi.video/tools/) installert (DLL-en finnes automatisk).
 Uten NDI-runtime kjører appen fortsatt — med tydelig banner, forhåndsvisning og navigasjon.

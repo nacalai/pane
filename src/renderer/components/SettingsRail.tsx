@@ -76,6 +76,31 @@ export function SettingsRail({ state }: { state: VevState }): React.JSX.Element 
       </section>
 
       <section className="card">
+        <h2 className="card__title">Oppstart</h2>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={config.launchAtLogin}
+            onChange={(e) => apply({ launchAtLogin: e.target.checked })}
+          />
+          <span>Start med Windows (skjult i tray)</span>
+        </label>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={config.startMinimized}
+            onChange={(e) => apply({ startMinimized: e.target.checked })}
+          />
+          <span>Start minimert i tray</span>
+        </label>
+        <p className="card__note">
+          Lukkeknappen (X) avslutter ikke — den minimerer til systemstatusfeltet der NDI
+          fortsetter. Høyreklikk tray-ikonet for å avslutte. «Start med Windows» virker kun i
+          den installerte appen.
+        </p>
+      </section>
+
+      <section className="card">
         <h2 className="card__title">Visning</h2>
         <label className="field">
           <span className="field__label">Modus</span>

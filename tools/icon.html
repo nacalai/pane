@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; }
+  html, body { width: 512px; height: 512px; background: transparent; }
+  .tile {
+    width: 512px; height: 512px;
+    background: linear-gradient(145deg, #16202c 0%, #0C1116 60%);
+    border-radius: 96px;
+    position: relative;
+    overflow: hidden;
+    font-family: 'Segoe UI', -apple-system, sans-serif;
+  }
+  .bar {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 34px;
+    background: linear-gradient(90deg, #036CA5, #0284C7, #00A9FD);
+  }
+  .v {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #FAFBFC; font-size: 330px; font-weight: 700; letter-spacing: -0.04em;
+    padding-bottom: 30px;
+  }
+  .dot { color: #1FB6F6; }
+  .grid {
+    position: absolute; inset: 0; opacity: .5;
+    background-image:
+      linear-gradient(rgba(255,255,255,.05) 2px, transparent 2px),
+      linear-gradient(90deg, rgba(255,255,255,.05) 2px, transparent 2px);
+    background-size: 64px 64px;
+  }
+</style>
+</head>
+<body>
+  <div class="tile">
+    <div class="grid"></div>
+    <div class="v">V<span class="dot">.</span></div>
+    <div class="bar"></div>
+  </div>
+</body>
+</html>

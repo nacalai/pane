@@ -184,6 +184,13 @@ export class VevApp {
     return { ok: true, data: null }
   }
 
+  private loginItemHandler: ((cfg: VevConfig) => void) | null = null
+
+  /** index.ts registers this to sync the OS login item (packaged-only). */
+  onLoginItemChange(cb: (cfg: VevConfig) => void): void {
+    this.loginItemHandler = cb
+  }
+
   applySettings(patch: SettingsPatch): IpcResult {
     const next: VevConfig = { ...this.config, ...patch }
     next.ndiName = sanitizeNdiName(next.ndiName)
@@ -193,9 +200,11 @@ export class VevApp {
       next.httpPort !== this.config.httpPort ||
       next.httpLan !== this.config.httpLan ||
       next.httpToken !== this.config.httpToken
+    const loginChanged = next.launchAtLogin !== this.config.launchAtLogin
     this.config = next
     this.store.save(next)
     this.capture.applyConfig(next)
+    if (loginChanged && this.loginItemHandler) this.loginItemHandler(next)
     if (httpChanged) {
       this.http.apply({
         enabled: next.httpEnabled,
