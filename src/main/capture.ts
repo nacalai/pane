@@ -13,7 +13,7 @@
  * Also: navigation state, input injection, crash/hang/load-failure recovery.
  * The offscreen CPU path requires app.disableHardwareAcceleration() — done in index.ts.
  */
-import { BrowserWindow, session, type WebContents } from 'electron'
+import { BrowserWindow, screen, session, type WebContents } from 'electron'
 import { EventEmitter } from 'node:events'
 import { join } from 'node:path'
 import { mapInput } from './input-map'
@@ -145,7 +145,7 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
 
     if (presenter) {
       win.setMenuBarVisibility(false)
-      if (this.cfg.presenterFullscreen) win.setFullScreen(true)
+      this.positionPresenter(win)
       // F11 toggles fullscreen; Esc leaves it. Everything else flows to the page.
       contents.on('before-input-event', (event, input) => {
         if (input.type !== 'keyDown') return
@@ -500,8 +500,13 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
     if (next.localAudio !== prev.localAudio) {
       this.contents?.setAudioMuted(!next.localAudio)
     }
-    if (next.presenterFullscreen !== prev.presenterFullscreen && next.mode === 'presenter') {
-      this.win.setFullScreen(next.presenterFullscreen)
+    if (
+      next.mode === 'presenter' &&
+      (next.presenterFullscreen !== prev.presenterFullscreen ||
+        next.presenterDisplayId !== prev.presenterDisplayId)
+    ) {
+      // Windowed↔fullscreen and/or a different monitor → re-place the window.
+      this.positionPresenter(this.win)
     }
     if (next.ndiName !== prev.ndiName && this.currentTarget === INTERNAL_TESTCARD) {
       this.loadTarget(INTERNAL_TESTCARD) // testcard displays the NDI name — refresh it
@@ -511,6 +516,51 @@ export class VevCapture extends EventEmitter<CaptureEvents> {
 
   isPresenterFullscreen(): boolean {
     return this.cfg.mode === 'presenter' && !!this.win && !this.win.isDestroyed() && this.win.isFullScreen()
+  }
+
+  /** The monitor the presenter window should use. presenterDisplayId 0 = follow primary. */
+  private resolveDisplay(): Electron.Display {
+    if (this.cfg.presenterDisplayId === 0) return screen.getPrimaryDisplay()
+    return (
+      screen.getAllDisplays().find((d) => d.id === this.cfg.presenterDisplayId) ??
+      screen.getPrimaryDisplay()
+    )
+  }
+
+  /**
+   * Place the presenter window on the chosen monitor, windowed (centered in the work area
+   * at capture resolution) or fullscreen (covering that monitor). Always drops fullscreen
+   * first so setBounds can actually move the window between displays before re-entering it.
+   */
+  private positionPresenter(win: BrowserWindow): void {
+    if (win.isDestroyed()) return
+    const target = this.resolveDisplay()
+    console.log(
+      `[capture] presenter → skjerm ${target.label} (${target.bounds.x},${target.bounds.y} ${target.size.width}×${target.size.height}) fullscreen=${this.cfg.presenterFullscreen}`
+    )
+    if (win.isFullScreen()) win.setFullScreen(false)
+    win.setContentSize(this.cfg.width, this.cfg.height)
+    const wb = win.getBounds()
+    if (this.cfg.presenterFullscreen) {
+      // Move onto the target monitor, then fullscreen there.
+      win.setBounds({ x: target.bounds.x, y: target.bounds.y, width: wb.width, height: wb.height })
+      win.setFullScreen(true)
+    } else {
+      const wa = target.workArea
+      win.setBounds({
+        x: wa.x + Math.max(0, Math.round((wa.width - wb.width) / 2)),
+        y: wa.y + Math.max(0, Math.round((wa.height - wb.height) / 2)),
+        width: wb.width,
+        height: wb.height
+      })
+    }
+  }
+
+  /** Re-place the presenter window if a monitor was added/removed/reconfigured. */
+  onDisplaysChanged(): void {
+    if (this.cfg.mode === 'presenter' && this.win && !this.win.isDestroyed()) {
+      this.positionPresenter(this.win)
+    }
   }
 
   private rebuildWindow(): void {

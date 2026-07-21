@@ -95,6 +95,14 @@ describe('IPC schemas', () => {
     expect(parseConfig(undefined).httpPort).toBe(9350)
   })
 
+  it('validates the presenter display id', () => {
+    expect(SettingsPatchSchema.safeParse({ presenterDisplayId: 0 }).success).toBe(true)
+    expect(SettingsPatchSchema.safeParse({ presenterDisplayId: 667457223 }).success).toBe(true)
+    expect(SettingsPatchSchema.safeParse({ presenterDisplayId: -1 }).success).toBe(false)
+    expect(SettingsPatchSchema.safeParse({ presenterDisplayId: 1.5 }).success).toBe(false)
+    expect(parseConfig(undefined).presenterDisplayId).toBe(0)
+  })
+
   it('validates and defaults the startup flags', () => {
     expect(SettingsPatchSchema.safeParse({ launchAtLogin: true, startMinimized: true }).success).toBe(
       true

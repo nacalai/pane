@@ -34,6 +34,7 @@ export interface VevConfig {
   autoStart: boolean
   mode: VevMode
   presenterFullscreen: boolean
+  presenterDisplayId: number
   httpEnabled: boolean
   httpPort: number
   httpLan: boolean
@@ -55,6 +56,7 @@ export const DEFAULT_CONFIG: VevConfig = {
   autoStart: true,
   mode: 'studio',
   presenterFullscreen: false,
+  presenterDisplayId: 0,
   httpEnabled: true,
   httpPort: DEFAULT_HTTP_PORT,
   httpLan: false,
@@ -78,6 +80,8 @@ export const SettingsPatchSchema = z
     autoStart: z.boolean(),
     mode: z.enum(['studio', 'presenter']),
     presenterFullscreen: z.boolean(),
+    // 0 = follow primary display; otherwise an Electron display id.
+    presenterDisplayId: z.number().int().min(0),
     httpEnabled: z.boolean(),
     httpPort: z.number().int().min(1024).max(65535),
     httpLan: z.boolean(),
@@ -149,6 +153,15 @@ export type InputEventReq = z.infer<typeof InputEventSchema>
 
 export type NdiStatus = 'off' | 'live' | 'no-runtime' | 'error'
 
+/** A connected monitor, for the presenter-window display picker. */
+export interface DisplayInfo {
+  id: number
+  label: string
+  width: number
+  height: number
+  primary: boolean
+}
+
 export interface NavFailure {
   code: number
   description: string
@@ -175,6 +188,7 @@ export interface VevState {
   staticPage: boolean
   presenterFullscreen: boolean
   httpError: string | null
+  displays: DisplayInfo[]
   nav: NavState
   config: VevConfig
 }

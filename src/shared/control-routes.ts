@@ -14,7 +14,7 @@ export type ControlCommand =
   | { kind: 'click'; x: number; y: number; button: 0 | 1 | 2 }
   | { kind: 'testcard' }
   | { kind: 'ndi'; on: boolean }
-  | { kind: 'mode'; mode: VevMode; fullscreen?: boolean }
+  | { kind: 'mode'; mode: VevMode; fullscreen?: boolean; displayId?: number }
 
 export type RouteResult =
   | { ok: true; cmd: ControlCommand }
@@ -99,9 +99,21 @@ export function routeCommand(pathname: string, q: URLSearchParams): RouteResult 
     case '/api/presenter/open': {
       const fs = q.get('fullscreen')
       if (fs !== null && fs !== '0' && fs !== '1') return bad('fullscreen må være 0 eller 1')
+      const disp = q.get('display')
+      let displayId: number | undefined
+      if (disp !== null) {
+        const n = Number(disp)
+        if (!Number.isInteger(n) || n < 0) return bad('display må være et heltall ≥ 0')
+        displayId = n
+      }
       return {
         ok: true,
-        cmd: { kind: 'mode', mode: 'presenter', ...(fs !== null ? { fullscreen: fs === '1' } : {}) }
+        cmd: {
+          kind: 'mode',
+          mode: 'presenter',
+          ...(fs !== null ? { fullscreen: fs === '1' } : {}),
+          ...(displayId !== undefined ? { displayId } : {})
+        }
       }
     }
     // "Close" the presenter view = back to hidden studio mode; NDI keeps streaming the page.

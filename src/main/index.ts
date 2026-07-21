@@ -4,7 +4,8 @@
  * Offscreen rendering (CPU path) requires hardware acceleration OFF and a
  * forced 1x device scale so paint buffers match the configured resolution.
  */
-import { app, BrowserWindow, Menu, nativeImage, Tray } from 'electron'
+import { app, BrowserWindow, Menu, nativeImage, screen, Tray } from 'electron'
+import type { DisplayInfo } from '@shared/schema'
 import { existsSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -36,6 +37,18 @@ const HIDDEN_FLAG = '--hidden'
 function syncLoginItem(enabled: boolean): void {
   if (!app.isPackaged) return
   app.setLoginItemSettings({ openAtLogin: enabled, args: [HIDDEN_FLAG] })
+}
+
+/** Connected monitors for the presenter-window display picker. */
+function readDisplays(): DisplayInfo[] {
+  const primaryId = screen.getPrimaryDisplay().id
+  return screen.getAllDisplays().map((d, i) => ({
+    id: d.id,
+    label: d.label || `Skjerm ${i + 1}`,
+    width: d.size.width,
+    height: d.size.height,
+    primary: d.id === primaryId
+  }))
 }
 
 /**
@@ -166,6 +179,12 @@ if (!app.requestSingleInstanceLock()) {
     vev.attachControl(control)
     registerIpc(vev)
     vev.startHttp()
+    // Feed the monitor list now and whenever it changes (plug/unplug/rearrange).
+    vev.setDisplays(readDisplays())
+    const refreshDisplays = (): void => vev?.setDisplays(readDisplays())
+    screen.on('display-added', refreshDisplays)
+    screen.on('display-removed', refreshDisplays)
+    screen.on('display-metrics-changed', refreshDisplays)
     vev.capture.start()
 
     if (process.env.VEV_SELFCHECK_URL) {

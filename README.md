@@ -31,6 +31,7 @@ Uten NDI-runtime kjører appen fortsatt — med tydelig banner, forhåndsvisning
 |---|---|---|
 | Vindu | Skjult — rendres offscreen i nøyaktig oppløsning | Synlig 1920×1080-vindu, F11 = fullskjerm |
 | Styring | Klikk/tast i forhåndsvisningen i kontrollvinduet | Presentereren bruker siden **direkte** — klikk, grafer, skjemaer |
+| Åpne | — | «Åpne i vindu» / «Åpne i fullskjerm» + velg **skjerm** i høyrepanelet (F11 veksler) |
 | Bildekilde | `paint`-events (offscreen) | `capturePage`-polling av det synlige vinduet |
 | Alfa/transparent | ✅ (HTML-grafikk keyes i vMix) | — |
 
@@ -50,7 +51,8 @@ GET /api/click?x=0.5&y=0.5           klikk (normaliserte koordinater)
 GET /api/go?url=vg.no                bytt side
 GET /api/nav/back|forward|reload     nettlesernavigasjon
 GET /api/testcard                    testkortet på lufta
-GET /api/presenter?fullscreen=1      presenter-modus (fullskjerm)
+GET /api/presenter/open?fullscreen=1&display=<id>   åpne presenter (skjerm valgfri)
+GET /api/presenter/close             lukk presenter (tilbake til studio)
 GET /api/studio                      tilbake til skjult studio-modus
 GET /api/ndi/start | /api/ndi/stop   NDI av/på
 GET /api/status                      full tilstand som JSON (for feedbacks)

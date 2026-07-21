@@ -87,6 +87,19 @@ describe('routeCommand', () => {
     expect(routeCommand('/api/presenter', q('fullscreen=x')).ok).toBe(false)
   })
 
+  it('presenter accepts a display id and validates it', () => {
+    expect(routeCommand('/api/presenter/open', q('fullscreen=1&display=667457223'))).toEqual({
+      ok: true,
+      cmd: { kind: 'mode', mode: 'presenter', fullscreen: true, displayId: 667457223 }
+    })
+    expect(routeCommand('/api/presenter', q('display=0'))).toEqual({
+      ok: true,
+      cmd: { kind: 'mode', mode: 'presenter', displayId: 0 }
+    })
+    expect(routeCommand('/api/presenter', q('display=-1')).ok).toBe(false)
+    expect(routeCommand('/api/presenter', q('display=abc')).ok).toBe(false)
+  })
+
   it('unknown endpoints 404', () => {
     const r = routeCommand('/api/nope', q())
     expect(r).toEqual({ ok: false, status: 404, error: 'ukjent endepunkt: /api/nope' })

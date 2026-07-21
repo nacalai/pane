@@ -232,6 +232,21 @@ body {
 .btn--stop:hover:not(:disabled) {
   background: #e04434;
 }
+.btn--active {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+}
+.btn--active:hover:not(:disabled) {
+  background: var(--blue-deep);
+}
+.btn-row {
+  display: flex;
+  gap: 8px;
+}
+.btn-row .btn {
+  flex: 1;
+}
 
 /* ---------- main area ---------- */
 .main {

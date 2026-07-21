@@ -101,30 +101,52 @@ export function SettingsRail({ state }: { state: VevState }): React.JSX.Element 
       </section>
 
       <section className="card">
-        <h2 className="card__title">Visning</h2>
+        <h2 className="card__title">Presenter-visning</h2>
+        <p className="card__note">
+          Åpne siden i et synlig vindu presentereren styrer direkte — klikk, grafer, skjemaer.
+          NDI sender nøyaktig det samme bildet. F11 veksler fullskjerm; Esc avslutter fullskjerm.
+        </p>
         <label className="field">
-          <span className="field__label">Modus</span>
+          <span className="field__label">Skjerm</span>
           <select
             className="field__input"
-            value={config.mode}
-            onChange={(e) => apply({ mode: e.target.value })}
+            value={config.presenterDisplayId}
+            onChange={(e) => apply({ presenterDisplayId: Number(e.target.value) })}
           >
-            <option value="studio">Studio — skjult, styres herfra</option>
-            <option value="presenter">Presenter — synlig vindu</option>
+            <option value={0}>Primær skjerm (auto)</option>
+            {state.displays.map((d, i) => (
+              <option key={d.id} value={d.id}>
+                Skjerm {i + 1}
+                {d.primary ? ' (primær)' : ''} — {d.label} {d.width}×{d.height}
+              </option>
+            ))}
           </select>
         </label>
-        {presenter && (
+        <div className="btn-row">
           <button
-            className="btn"
-            onClick={() => apply({ presenterFullscreen: !state.presenterFullscreen })}
+            className={`btn ${presenter && !state.presenterFullscreen ? 'btn--active' : ''}`}
+            onClick={() => apply({ mode: 'presenter', presenterFullscreen: false })}
           >
-            {state.presenterFullscreen ? 'Avslutt fullskjerm' : 'Fullskjerm (F11)'}
+            Åpne i vindu
+          </button>
+          <button
+            className={`btn ${presenter && state.presenterFullscreen ? 'btn--active' : ''}`}
+            onClick={() => apply({ mode: 'presenter', presenterFullscreen: true })}
+          >
+            Åpne i fullskjerm
+          </button>
+        </div>
+        {presenter && (
+          <button className="btn btn--stop" onClick={() => apply({ mode: 'studio' })}>
+            Lukk presenter (tilbake til studio)
           </button>
         )}
         <p className="card__note">
           {presenter
-            ? 'Presentereren bruker nettsiden direkte i det synlige vinduet — klikk, skjemaer, alt. NDI sender det samme bildet.'
-            : 'Siden rendres skjult i nøyaktig oppløsning; du styrer den via forhåndsvisningen.'}
+            ? state.presenterFullscreen
+              ? 'Åpen i fullskjerm på valgt skjerm.'
+              : 'Åpen som vindu på valgt skjerm.'
+            : 'Studio: siden rendres skjult i nøyaktig oppløsning; du styrer den via forhåndsvisningen.'}
         </p>
       </section>
 

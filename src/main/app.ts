@@ -11,6 +11,7 @@ import { ControlServer } from './control-server'
 import type { ControlCommand } from '@shared/control-routes'
 import {
   sanitizeNdiName,
+  type DisplayInfo,
   type IpcResult,
   type NdiStatus,
   type SettingsPatch,
@@ -30,8 +31,16 @@ export class VevApp {
   private control: BrowserWindow | null = null
   private psbId: number | null = null
   private downThis = false
+  private displays: DisplayInfo[] = []
 
   readonly http = new ControlServer((cmd) => this.execCommand(cmd))
+
+  /** index.ts feeds the connected-monitor list here (and on hotplug). */
+  setDisplays(displays: DisplayInfo[]): void {
+    this.displays = displays
+    this.capture.onDisplaysChanged()
+    this.pushState()
+  }
 
   constructor(
     private readonly store: ConfigStore,
@@ -115,8 +124,9 @@ export class VevApp {
       }
       case 'mode': {
         const patch: SettingsPatch = { mode: cmd.mode }
-        if (cmd.mode === 'presenter' && cmd.fullscreen !== undefined) {
-          patch.presenterFullscreen = cmd.fullscreen
+        if (cmd.mode === 'presenter') {
+          if (cmd.fullscreen !== undefined) patch.presenterFullscreen = cmd.fullscreen
+          if (cmd.displayId !== undefined) patch.presenterDisplayId = cmd.displayId
         }
         const r = this.applySettings(patch)
         return r.ok ? { ok: true, data: null } : r
@@ -239,6 +249,7 @@ export class VevApp {
       staticPage: this.lastStats.staticPage,
       presenterFullscreen: this.capture.isPresenterFullscreen(),
       httpError: this.http.error,
+      displays: this.displays,
       nav: this.capture.currentNav(),
       config: { ...this.config }
     }
