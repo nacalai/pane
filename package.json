@@ -1,6 +1,6 @@
 {
   "name": "pane",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Pane — webpage → NDI. Render any page offscreen at broadcast resolution and publish it as a real NDI source (video + alpha), navigable through a live preview.",
   "main": "out/main/index.js",
   "type": "module",
@@ -16,9 +16,23 @@
   "build": {
     "appId": "no.creavid.pane",
     "productName": "Pane",
-    "directories": { "output": "release", "buildResources": "build" },
-    "files": ["out/**/*", "resources/**/*", "package.json"],
-    "asarUnpack": ["node_modules/koffi/**"],
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "out/**/*",
+      "resources/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/koffi/**"
+    ],
+    "publish": {
+      "provider": "github",
+      "owner": "nacalai",
+      "repo": "pane"
+    },
     "win": {
       "target": "nsis",
       "icon": "build/icon.png"
@@ -33,6 +47,7 @@
     }
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "koffi": "^3.1.2"
   },
   "devDependencies": {

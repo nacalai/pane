@@ -5,7 +5,10 @@
  * forced 1x device scale so paint buffers match the configured resolution.
  */
 import { app, BrowserWindow, Menu, nativeImage, screen, Tray } from 'electron'
+import electronUpdater from 'electron-updater'
 import type { DisplayInfo } from '@shared/schema'
+
+const { autoUpdater } = electronUpdater
 import { existsSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -25,6 +28,38 @@ app.setAppUserModelId('no.creavid.pane')
 let tray: Tray | null = null
 /** True once the user really wants to quit — the X button only hides to tray. */
 let isQuitting = false
+/** Version of a downloaded update waiting to install (offered in the tray). */
+let updateReadyVersion: string | null = null
+
+/**
+ * Auto-update from GitHub Releases (public repo, no token needed). Downloads in the background
+ * and installs on quit — NEVER mid-broadcast. The tray offers an explicit "Restart to update"
+ * once a build is downloaded. Packaged builds only; never during selfcheck/dev.
+ */
+function setupAutoUpdate(): void {
+  if (!app.isPackaged || SELFCHECK) return
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
+  autoUpdater.on('error', (e: Error) => console.error('[update] error:', e.message))
+  autoUpdater.on('update-available', (i: { version: string }) =>
+    console.log('[update] available:', i.version)
+  )
+  autoUpdater.on('update-not-available', () => console.log('[update] up to date'))
+  autoUpdater.on('update-downloaded', (i: { version: string }) => {
+    updateReadyVersion = i.version
+    console.log(`[update] ${i.version} downloaded — installs on quit`)
+    tray?.setToolTip(`Pane — update ${i.version} ready (restart to apply)`)
+    rebuildTrayMenu?.()
+  })
+  const check = (): void => {
+    autoUpdater.checkForUpdates().catch((e: Error) => console.error('[update] check:', e.message))
+  }
+  check()
+  setInterval(check, 6 * 60 * 60 * 1000) // every 6 hours
+}
+
+/** Set by createTray so the update handler can refresh the menu when a build lands. */
+let rebuildTrayMenu: (() => void) | null = null
 
 /** Marker arg the login-item launch adds so a boot start comes up hidden to tray. */
 const HIDDEN_FLAG = '--hidden'
@@ -196,6 +231,7 @@ if (!app.requestSingleInstanceLock()) {
     screen.on('display-removed', refreshDisplays)
     screen.on('display-metrics-changed', refreshDisplays)
     pane.capture.start()
+    setupAutoUpdate()
 
     if (process.env.PANE_SELFCHECK_URL) {
       const r = pane.navigate(process.env.PANE_SELFCHECK_URL)
@@ -235,7 +271,7 @@ app.on('window-all-closed', () => {
   if (isQuitting || SELFCHECK) app.quit()
 })
 
-/** System-tray icon: click to show, right-click for a menu whose only exit is Avslutt. */
+/** System-tray icon: click to show, right-click for a menu whose only exit is Quit. */
 function createTray(showControl: () => void, resourcesDir: string): Tray {
   const iconPath = join(resourcesDir, 'icon.png')
   const image = existsSync(iconPath)
@@ -245,23 +281,37 @@ function createTray(showControl: () => void, resourcesDir: string): Tray {
   t.setToolTip('Pane — webpage → NDI')
   const rebuildMenu = (): void => {
     const live = pane?.state().ndi === 'live'
-    t.setContextMenu(
-      Menu.buildFromTemplate([
-        { label: live ? '● NDI on air' : 'NDI off', enabled: false },
-        { type: 'separator' },
-        { label: 'Open Pane', click: showControl },
-        { type: 'separator' },
+    const items: Electron.MenuItemConstructorOptions[] = [
+      { label: live ? '● NDI on air' : 'NDI off', enabled: false },
+      { type: 'separator' }
+    ]
+    if (updateReadyVersion) {
+      items.push(
         {
-          label: 'Quit Pane',
+          label: `Restart to update to ${updateReadyVersion}`,
           click: () => {
             isQuitting = true
-            app.quit()
+            autoUpdater.quitAndInstall()
           }
+        },
+        { type: 'separator' }
+      )
+    }
+    items.push(
+      { label: 'Open Pane', click: showControl },
+      { type: 'separator' },
+      {
+        label: 'Quit Pane',
+        click: () => {
+          isQuitting = true
+          app.quit()
         }
-      ])
+      }
     )
+    t.setContextMenu(Menu.buildFromTemplate(items))
   }
   rebuildMenu()
+  rebuildTrayMenu = rebuildMenu
   // Refresh the on-air label whenever the menu is about to open.
   t.on('click', showControl)
   t.on('right-click', rebuildMenu)
