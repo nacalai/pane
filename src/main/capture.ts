@@ -13,7 +13,7 @@
  * Also: navigation state, input injection, crash/hang/load-failure recovery.
  * The offscreen CPU path requires app.disableHardwareAcceleration() — done in index.ts.
  */
-import { BrowserWindow, screen, session, type WebContents } from 'electron'
+import { BrowserWindow, nativeImage, screen, session, type WebContents } from 'electron'
 import { EventEmitter } from 'node:events'
 import { join } from 'node:path'
 import { mapInput } from './input-map'
@@ -23,9 +23,9 @@ import { INTERNAL_TESTCARD, normalizeUrl } from '@shared/url'
 import type { Fps, InputEventReq, NavAction, NavState, PaneConfig } from '@shared/schema'
 
 const PARTITION = 'persist:pane-content'
-const PREVIEW_INTERVAL_MS = 100
-const PREVIEW_WIDTH = 640
-const PREVIEW_JPEG_QUALITY = 65
+const PREVIEW_INTERVAL_MS = 50 // ~20 fps preview (was 10) — smoother
+const PREVIEW_WIDTH = 960 // higher-res preview (was 640) — crisper
+const PREVIEW_JPEG_QUALITY = 82 // less compression noise (was 65)
 const STATS_INTERVAL_MS = 500
 const MAX_CRASH_RELOADS = 3
 const CRASH_BACKOFF_MS = [1000, 2000, 4000] as const
@@ -56,54 +56,95 @@ const DITHER_CSS =
   '")}'
 
 /**
- * Optional synthetic cursor rendered INTO the page so it appears in the NDI output (the OS
- * cursor and CSS cursor are never captured by OSR/capturePage). A pointer-events:none element
- * follows the page's mousemove, which fires for injected moves (studio) and the real mouse
- * (presenter) alike. Two styles: a colored dot (laser pointer) or a normal arrow pointer.
- *
- * A companion stylesheet hides the OS cursor (`* {cursor:none}`) — otherwise the presenter's
- * VISIBLE window shows BOTH the Windows arrow and our synthetic cursor at once. Hiding the OS
- * cursor makes what the presenter sees match the NDI output exactly.
+ * The in-output cursor is COMPOSITED onto the outgoing BGRA frame in the main process — not
+ * injected into the page. This is what makes it follow the mouse everywhere, including over
+ * cross-origin ad iframes (which never forward mousemove to the page and used to freeze a
+ * DOM cursor), and it never doubles with the OS cursor. Position comes from the real OS cursor
+ * (presenter) or the last injected move (studio).
  */
-const CURSOR_HIDE_CSS = '*{cursor:none !important}'
+function hexToBgr(hex: string): [number, number, number] {
+  return [parseInt(hex.slice(5, 7), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(1, 3), 16)]
+}
 
-/** A standard arrow pointer as a base64 data URI (base64 sidesteps quote/# escaping issues). */
-const CURSOR_ARROW_SVG =
-  '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">' +
-  '<path d="M4 2 L4 19 L9 14.2 L12.2 21 L15.2 19.6 L12 13 L18.5 13 Z" fill="#ffffff" stroke="#111111" stroke-width="1.5" stroke-linejoin="round"/></svg>'
-const CURSOR_ARROW_URI = 'data:image/svg+xml;base64,' + Buffer.from(CURSOR_ARROW_SVG).toString('base64')
+/** Alpha-blend one BGRA pixel; leaves the frame opaque (alpha stays 255). */
+function blendPx(buf: Buffer, idx: number, b: number, g: number, r: number, a: number): void {
+  if (a <= 0) return
+  const ia = 255 - a
+  buf[idx] = ((buf[idx]! * ia + b * a) / 255) | 0
+  buf[idx + 1] = ((buf[idx + 1]! * ia + g * a) / 255) | 0
+  buf[idx + 2] = ((buf[idx + 2]! * ia + r * a) / 255) | 0
+  buf[idx + 3] = 255
+}
 
-function cursorElementCss(style: 'arrow' | 'dot', color: string): string {
-  const base = 'position:fixed;left:-100px;top:-100px;pointer-events:none;z-index:2147483647;'
-  if (style === 'arrow') {
-    return base + `width:24px;height:24px;margin:-2px 0 0 -3px;background:no-repeat left top/contain url("${CURSOR_ARROW_URI}")`
+/** Anti-aliased filled disc. */
+function fillDisc(
+  buf: Buffer, w: number, h: number, cx: number, cy: number, radius: number,
+  b: number, g: number, r: number, maxA = 255
+): void {
+  const R = Math.ceil(radius) + 1
+  for (let dy = -R; dy <= R; dy++) {
+    const y = cy + dy
+    if (y < 0 || y >= h) continue
+    for (let dx = -R; dx <= R; dx++) {
+      const x = cx + dx
+      if (x < 0 || x >= w) continue
+      const d = Math.sqrt(dx * dx + dy * dy)
+      if (d > radius + 0.5) continue
+      const cov = d <= radius - 0.5 ? 1 : radius + 0.5 - d
+      blendPx(buf, (y * w + x) * 4, b, g, r, Math.round(cov * maxA))
+    }
   }
-  return (
-    base +
-    `width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:${color};` +
-    'box-shadow:0 0 0 2px #fff,0 1px 6px rgba(0,0,0,.6)'
-  )
 }
 
-/** JS that creates-or-restyles the cursor element and wires one mousemove listener. JSON.stringify
- *  embeds the css safely (handles the url("…") quotes) so re-injecting with a new style/color works. */
-function buildCursorApplyJs(style: 'arrow' | 'dot', color: string): string {
-  const css = cursorElementCss(style, color)
-  return (
-    '(function(){var el=document.getElementById("__pane-cursor");' +
-    'if(!el){el=document.createElement("div");el.id="__pane-cursor";(document.body||document.documentElement).appendChild(el);}' +
-    'el.style.cssText=' +
-    JSON.stringify(css) +
-    ';if(window.__paneCursorX!=null){el.style.left=window.__paneCursorX+"px";el.style.top=window.__paneCursorY+"px";}' +
-    'if(!window.__paneCursorMove){var move=function(e){window.__paneCursorX=e.clientX;window.__paneCursorY=e.clientY;' +
-    'var c=document.getElementById("__pane-cursor");if(c){c.style.left=e.clientX+"px";c.style.top=e.clientY+"px";}};' +
-    'window.addEventListener("mousemove",move,true);window.__paneCursorMove=move;}window.__paneCursor=el;})()'
-  )
+/** Classic arrow pointer outline; each point is [dx,dy] from the cursor hotspot (top-left). */
+const ARROW_POLY: Array<[number, number]> = [
+  [0, 0], [0, 17], [4.5, 12.8], [8, 20], [10.6, 18.9], [7.2, 11.7], [13.5, 11.7]
+]
+function fillPolygon(
+  buf: Buffer, w: number, h: number, ox: number, oy: number,
+  poly: Array<[number, number]>, b: number, g: number, r: number, a: number
+): void {
+  let minY = Infinity, maxY = -Infinity
+  for (const [, py] of poly) {
+    minY = Math.min(minY, py)
+    maxY = Math.max(maxY, py)
+  }
+  for (let y = Math.floor(minY); y <= Math.ceil(maxY); y++) {
+    const xs: number[] = []
+    for (let i = 0; i < poly.length; i++) {
+      const [x1, y1] = poly[i]!
+      const [x2, y2] = poly[(i + 1) % poly.length]!
+      if (y1 <= y === y2 <= y) continue
+      xs.push(x1 + ((y - y1) / (y2 - y1)) * (x2 - x1))
+    }
+    xs.sort((p, q) => p - q)
+    for (let k = 0; k + 1 < xs.length; k += 2) {
+      for (let x = Math.round(xs[k]!); x < Math.round(xs[k + 1]!); x++) {
+        const px = ox + x, py = oy + y
+        if (px >= 0 && py >= 0 && px < w && py < h) blendPx(buf, (py * w + px) * 4, b, g, r, a)
+      }
+    }
+  }
 }
-const CURSOR_REMOVE_JS =
-  '(function(){if(window.__paneCursorMove){window.removeEventListener("mousemove",window.__paneCursorMove,true)}' +
-  'var el=document.getElementById("__pane-cursor");if(el)el.remove();' +
-  'window.__paneCursor=null;window.__paneCursorMove=null;window.__paneCursorX=null;})()'
+
+/** Composite the cursor (dot or arrow) onto a BGRA frame at (cx,cy). */
+function compositeCursor(
+  buf: Buffer, w: number, h: number, cx: number, cy: number,
+  style: 'arrow' | 'dot', color: string
+): void {
+  const [b, g, r] = hexToBgr(color)
+  if (style === 'dot') {
+    fillDisc(buf, w, h, cx, cy, 9.5, 0, 0, 0, 90) // soft shadow for contrast on any page
+    fillDisc(buf, w, h, cx, cy, 8, 255, 255, 255) // white ring
+    fillDisc(buf, w, h, cx, cy, 6, b, g, r) // colored core
+  } else {
+    // Dark outline (shifted copies) then white fill — reads as a normal pointer on any bg.
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as Array<[number, number]>) {
+      fillPolygon(buf, w, h, cx + dx, cy + dy, ARROW_POLY, 0, 0, 0, 235)
+    }
+    fillPolygon(buf, w, h, cx, cy, ARROW_POLY, 255, 255, 255, 255)
+  }
+}
 
 export interface CaptureStats {
   sentFps: number
@@ -137,7 +178,8 @@ export class PaneCapture extends EventEmitter<CaptureEvents> {
   private crashReloadTimer: NodeJS.Timeout | null = null
   private disposed = false
   private ditherKey: string | null = null
-  private cursorHideKey: string | null = null
+  /** Last pointer position (0..1 in page space) for the studio composited cursor. */
+  private cursorNorm: { x: number; y: number } | null = null
   /** Guards the presenter window's 'closed' event during intentional rebuild/dispose. */
   private tearingWindow = false
 
@@ -190,7 +232,8 @@ export class PaneCapture extends EventEmitter<CaptureEvents> {
       width: this.cfg.width,
       height: this.cfg.height,
       useContentSize: true,
-      resizable: false,
+      // A non-resizable window can't go fullscreen on Windows — presenter must be resizable.
+      resizable: presenter,
       fullscreenable: true,
       autoHideMenuBar: true,
       title: 'Pane — presenter',
@@ -253,11 +296,9 @@ export class PaneCapture extends EventEmitter<CaptureEvents> {
     contents.on('page-title-updated', push)
     contents.on('did-finish-load', () => {
       this.crashCount = 0
-      // insertCSS is cleared on navigation; re-apply overlays for the new document.
+      // insertCSS is cleared on navigation; re-apply the dither overlay for the new document.
       this.ditherKey = null
-      this.cursorHideKey = null
       this.applyDither()
-      this.applyCursor()
       this.pushNav()
     })
 
@@ -344,14 +385,25 @@ export class PaneCapture extends EventEmitter<CaptureEvents> {
       img = image.resize({ width: this.cfg.width, height: this.cfg.height })
     }
     this.latest = img.toBitmap() // BGRA copy; the source buffer is only valid this tick
+
+    // Composite the in-output cursor onto the frame (follows the mouse everywhere).
+    let composited: Electron.NativeImage | null = null
+    if (this.cfg.showCursor) {
+      const pos = this.cursorPx()
+      if (pos) {
+        compositeCursor(this.latest, this.cfg.width, this.cfg.height, pos.x, pos.y, this.cfg.cursorStyle, this.cfg.cursorColor)
+        composited = nativeImage.createFromBitmap(this.latest, { width: this.cfg.width, height: this.cfg.height })
+      }
+    }
     this.pacer.onFrame(Date.now())
 
     const now = Date.now()
     if (this.cfg.showPreview && now - this.lastPreviewAt >= PREVIEW_INTERVAL_MS) {
       this.lastPreviewAt = now
       try {
-        const small = img.resize({ width: PREVIEW_WIDTH })
-        if (this.cfg.transparent && this.cfg.mode === 'studio') {
+        // Preview from the composited frame so it shows the cursor too; else straight from img.
+        const small = (composited ?? img).resize({ width: PREVIEW_WIDTH, quality: 'good' })
+        if (this.cfg.transparent && this.cfg.mode === 'studio' && !composited) {
           this.emit('preview', small.toPNG(), 'image/png')
         } else {
           this.emit('preview', small.toJPEG(PREVIEW_JPEG_QUALITY), 'image/jpeg')
@@ -360,6 +412,27 @@ export class PaneCapture extends EventEmitter<CaptureEvents> {
         console.error('[capture] preview encode:', (e as Error).message)
       }
     }
+  }
+
+  /** Cursor position in output pixels, or null if off-frame. OS cursor in presenter, last
+   *  injected move in studio. */
+  private cursorPx(): { x: number; y: number } | null {
+    if (this.cfg.mode === 'presenter' && this.win && !this.win.isDestroyed()) {
+      const p = screen.getCursorScreenPoint()
+      const cb = this.win.getContentBounds()
+      if (cb.width < 2 || cb.height < 2) return null
+      const nx = (p.x - cb.x) / cb.width
+      const ny = (p.y - cb.y) / cb.height
+      if (nx < 0 || ny < 0 || nx > 1 || ny > 1) return null
+      return { x: Math.round(nx * this.cfg.width), y: Math.round(ny * this.cfg.height) }
+    }
+    if (this.cursorNorm) {
+      return {
+        x: Math.round(this.cursorNorm.x * this.cfg.width),
+        y: Math.round(this.cursorNorm.y * this.cfg.height)
+      }
+    }
+    return null
   }
 
   /**
@@ -550,6 +623,10 @@ export class PaneCapture extends EventEmitter<CaptureEvents> {
   injectInput(req: InputEventReq): void {
     const contents = this.contents
     if (!contents) return
+    // Track the pointer so the studio composited cursor follows operator input.
+    if (req.kind === 'move' || req.kind === 'down' || req.kind === 'up') {
+      this.cursorNorm = { x: req.x, y: req.y }
+    }
     if (req.kind === 'down') contents.focus() // keyboard follows the click, like a real browser
     for (const ev of mapInput(req, this.cfg.width, this.cfg.height)) {
       contents.sendInputEvent(ev)
@@ -590,15 +667,7 @@ export class PaneCapture extends EventEmitter<CaptureEvents> {
       if (next.dither) this.applyDither()
       else this.removeDither()
     }
-    if (next.showCursor !== prev.showCursor) {
-      if (next.showCursor) this.applyCursor()
-      else this.removeCursor()
-    } else if (
-      next.showCursor &&
-      (next.cursorStyle !== prev.cursorStyle || next.cursorColor !== prev.cursorColor)
-    ) {
-      this.applyCursor() // restyle the existing cursor in place
-    }
+    // Cursor is composited each frame from cfg — no per-toggle work needed here.
     if (
       next.mode === 'presenter' &&
       (next.presenterFullscreen !== prev.presenterFullscreen ||
@@ -692,39 +761,6 @@ export class PaneCapture extends EventEmitter<CaptureEvents> {
         /* page may have navigated away — the CSS is already gone */
       })
     }
-  }
-
-  /**
-   * Inject the synthetic cursor (element following the mouse) + a stylesheet hiding the OS
-   * cursor, so the output shows our pointer and the presenter's visible window doesn't show a
-   * second (OS) cursor on top. When showCursor is OFF, neither is injected — the presenter uses
-   * the real OS mouse with zero latency and the output simply has no pointer.
-   */
-  private applyCursor(): void {
-    const contents = this.contents
-    if (!contents || !this.cfg.showCursor) return
-    contents
-      .executeJavaScript(buildCursorApplyJs(this.cfg.cursorStyle, this.cfg.cursorColor), true)
-      .catch((e: unknown) => console.error('[capture] cursor inject:', (e as Error).message))
-    if (!this.cursorHideKey) {
-      contents
-        .insertCSS(CURSOR_HIDE_CSS)
-        .then((key) => {
-          if (this.cfg.showCursor && this.contents === contents) this.cursorHideKey = key
-          else contents.removeInsertedCSS(key).catch(() => {})
-        })
-        .catch((e: unknown) => console.error('[capture] cursor-hide insertCSS:', (e as Error).message))
-    }
-  }
-
-  private removeCursor(): void {
-    const contents = this.contents
-    contents?.executeJavaScript(CURSOR_REMOVE_JS, true).catch(() => {
-      /* page may have navigated away — the element is already gone */
-    })
-    const key = this.cursorHideKey
-    this.cursorHideKey = null
-    if (contents && key) contents.removeInsertedCSS(key).catch(() => {})
   }
 
   /** Re-place the presenter window if a monitor was added/removed/reconfigured. */
