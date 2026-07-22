@@ -188,7 +188,9 @@ export class PaneApp {
   navigate(url: string): IpcResult {
     const r = this.capture.navigate(url)
     if (!r.ok) return r
-    this.config = { ...this.config, url: this.capture.currentNav().url }
+    // Persist the normalized target we actually navigated to (r.url) — NOT currentNav(),
+    // which still reports the pre-commit page and would save the previous URL.
+    this.config = { ...this.config, url: r.url }
     this.store.save(this.config)
     this.pushState()
     return { ok: true, data: null }

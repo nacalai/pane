@@ -16,7 +16,10 @@ export function normalizeUrl(input: string): UrlResult {
     return { ok: true, url: INTERNAL_TESTCARD }
   if (lower === 'about:blank') return { ok: true, url: 'about:blank' }
 
-  const hasScheme = /^[a-z][a-z0-9+.-]*:/i.test(raw)
+  // "host:port" (e.g. graphics:8080, localhost:3000) looks like a scheme but is really a bare
+  // host — the part after ':' is all digits. Treat those as needing https, not as a scheme.
+  const looksLikeHostPort = /^[a-z0-9.-]+:\d+(\/|$)/i.test(raw)
+  const hasScheme = !looksLikeHostPort && /^[a-z][a-z0-9+.-]*:/i.test(raw)
   const candidate = hasScheme ? raw : `https://${raw}`
   let parsed: URL
   try {

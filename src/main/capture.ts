@@ -210,10 +210,18 @@ export class PaneCapture extends EventEmitter<CaptureEvents> {
 
     // ---- navigation state ----
     const push = (): void => this.pushNav()
+    // A load that actually COMMITTED — adopt the real URL (handles redirects/in-page nav).
+    // currentTarget is only advanced here, never in the synchronous pushNav (which would
+    // otherwise read the pre-commit getURL() and clobber it back to the previous page).
+    const commit = (): void => {
+      const u = contents.getURL()
+      if (u && !u.startsWith('file:')) this.currentTarget = u
+      this.pushNav()
+    }
     contents.on('did-start-loading', push)
     contents.on('did-stop-loading', push)
-    contents.on('did-navigate', push)
-    contents.on('did-navigate-in-page', push)
+    contents.on('did-navigate', commit)
+    contents.on('did-navigate-in-page', commit)
     contents.on('page-title-updated', push)
     contents.on('did-finish-load', () => {
       this.crashCount = 0
@@ -411,12 +419,14 @@ export class PaneCapture extends EventEmitter<CaptureEvents> {
   // ---------- navigation ----------
 
   /** input: anything the user typed, or an already-normalized URL. */
-  navigate(input: string): { ok: true } | { ok: false; error: string } {
+  navigate(input: string): { ok: true; url: string } | { ok: false; error: string } {
     const res = normalizeUrl(input)
     if (!res.ok) return res
     this.failure = null
     this.loadTarget(res.url)
-    return { ok: true }
+    // Return the actual normalized target so the caller persists THIS url — not the
+    // stale committed URL that getURL()/currentTarget still report until the load commits.
+    return { ok: true, url: res.url }
   }
 
   private loadTarget(url: string): void {
@@ -491,9 +501,9 @@ export class PaneCapture extends EventEmitter<CaptureEvents> {
     const contents = this.contents
     if (!contents) return
     const rawUrl = contents.getURL()
-    // Internal file:// pages keep the *intended* target in the URL bar.
+    // Internal file:// pages keep the *intended* target in the URL bar. currentTarget is
+    // advanced only by the committed-navigation handler, never here (read-only).
     const displayUrl = rawUrl.startsWith('file:') || !rawUrl ? this.currentTarget : rawUrl
-    if (!rawUrl.startsWith('file:') && rawUrl) this.currentTarget = rawUrl
     this.emit('nav', {
       url: displayUrl === INTERNAL_TESTCARD ? INTERNAL_TESTCARD : displayUrl,
       title: contents.getTitle(),
@@ -589,6 +599,16 @@ export class PaneCapture extends EventEmitter<CaptureEvents> {
   private positionPresenter(win: BrowserWindow): void {
     if (win.isDestroyed()) return
     const target = this.resolveDisplay()
+    // Idempotent: if the window is already on the target display in the wanted mode, do
+    // nothing. Without this, any display-metrics-changed (resolution/DPI/taskbar) would drop
+    // and re-enter fullscreen on air — a visible glitch. Only genuine changes reposition.
+    const current = screen.getDisplayMatching(win.getBounds())
+    if (
+      current.id === target.id &&
+      win.isFullScreen() === this.cfg.presenterFullscreen
+    ) {
+      return
+    }
     console.log(
       `[capture] presenter → display ${target.label} (${target.bounds.x},${target.bounds.y} ${target.size.width}×${target.size.height}) fullscreen=${this.cfg.presenterFullscreen}`
     )
@@ -617,6 +637,12 @@ export class PaneCapture extends EventEmitter<CaptureEvents> {
     contents
       .insertCSS(DITHER_CSS)
       .then((key) => {
+        // If dither was toggled off (or the page navigated) while this insert was in flight,
+        // remove it immediately rather than leaving a stuck overlay on the live page.
+        if (!this.cfg.dither || this.contents !== contents) {
+          contents.removeInsertedCSS(key).catch(() => {})
+          return
+        }
         this.ditherKey = key
       })
       .catch((e: unknown) => console.error('[capture] dither insertCSS:', (e as Error).message))
@@ -669,6 +695,10 @@ export class PaneCapture extends EventEmitter<CaptureEvents> {
   private teardownWindow(win: BrowserWindow | null): void {
     if (!win || win.isDestroyed()) return
     this.tearingWindow = true
+    // Drop our 'closed' listener before destroy so an intentional teardown can never emit a
+    // spurious presenterClosed (belt-and-suspenders alongside the tearingWindow guard, in case
+    // 'closed' ever fires asynchronously after tearingWindow is reset).
+    win.removeAllListeners('closed')
     win.destroy()
     this.tearingWindow = false
   }

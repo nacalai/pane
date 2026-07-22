@@ -14,6 +14,18 @@ describe('normalizeUrl', () => {
     })
   })
 
+  it('treats bare host:port as https, not an unknown scheme (internal graphics servers)', () => {
+    expect(normalizeUrl('graphics:8080')).toEqual({ ok: true, url: 'https://graphics:8080/' })
+    expect(normalizeUrl('localhost:3000')).toEqual({ ok: true, url: 'https://localhost:3000/' })
+    expect(normalizeUrl('example.com:9000/path')).toEqual({
+      ok: true,
+      url: 'https://example.com:9000/path'
+    })
+    // real non-http schemes are still rejected (not mistaken for host:port)
+    expect(normalizeUrl('file:///c:/x').ok).toBe(false)
+    expect(normalizeUrl('javascript:alert(1)').ok).toBe(false)
+  })
+
   it('accepts the internal testcard id (both spellings)', () => {
     expect(normalizeUrl('pane:testcard')).toEqual({ ok: true, url: INTERNAL_TESTCARD })
     expect(normalizeUrl('Testkort')).toEqual({ ok: true, url: INTERNAL_TESTCARD })
