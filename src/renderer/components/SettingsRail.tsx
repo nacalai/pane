@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Fps, PaneState } from '@shared/schema'
 
 const PRESETS: Array<{ label: string; w: number; h: number }> = [
@@ -14,6 +14,14 @@ export function SettingsRail({ state }: { state: PaneState }): React.JSX.Element
   const [customH, setCustomH] = useState(String(config.height))
   const [showCustom, setShowCustom] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // STOP is guarded: first click arms, a second click within the window actually stops.
+  const [stopArmed, setStopArmed] = useState(false)
+  const stopTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    return () => {
+      if (stopTimer.current) clearTimeout(stopTimer.current)
+    }
+  }, [])
 
   const apply = (patch: Record<string, unknown>): void => {
     setError(null)
@@ -38,6 +46,26 @@ export function SettingsRail({ state }: { state: PaneState }): React.JSX.Element
   const live = state.ndi === 'live'
   const presenter = config.mode === 'presenter'
 
+  const disarmStop = (): void => {
+    if (stopTimer.current) clearTimeout(stopTimer.current)
+    stopTimer.current = null
+    setStopArmed(false)
+  }
+  const onNdiButton = (): void => {
+    if (!live) {
+      void window.pane.start()
+      return
+    }
+    if (!stopArmed) {
+      // First click while live only arms — prevents a stray click dropping the feed.
+      setStopArmed(true)
+      stopTimer.current = setTimeout(() => setStopArmed(false), 3000)
+      return
+    }
+    disarmStop()
+    void window.pane.stop()
+  }
+
   return (
     <aside className="rail">
       <section className="card">
@@ -59,11 +87,13 @@ export function SettingsRail({ state }: { state: PaneState }): React.JSX.Element
           />
         </label>
         <button
-          className={`btn btn--big ${live ? 'btn--stop' : 'btn--primary'}`}
+          className={`btn btn--big ${live ? (stopArmed ? 'btn--confirm' : 'btn--stop') : 'btn--primary'}`}
           disabled={state.ndi === 'no-runtime'}
-          onClick={() => void (live ? window.pane.stop() : window.pane.start())}
+          title={state.ndi === 'no-runtime' ? 'NDI runtime not installed' : undefined}
+          onClick={onNdiButton}
+          onMouseLeave={disarmStop}
         >
-          {live ? 'STOP NDI' : 'START NDI'}
+          {!live ? 'START NDI' : stopArmed ? 'CLICK AGAIN TO STOP' : 'STOP NDI'}
         </button>
         <label className="check">
           <input
@@ -147,11 +177,12 @@ export function SettingsRail({ state }: { state: PaneState }): React.JSX.Element
               ? 'Open fullscreen on the selected display.'
               : 'Open as a window on the selected display.'
             : 'Studio: the page renders hidden at exact resolution; you control it via the preview.'}
+          {' '}Switching between studio and presenter rebuilds the window — the page reloads.
         </p>
       </section>
 
       <section className="card">
-        <h2 className="card__title">Image</h2>
+        <h2 className="card__title">Output format</h2>
         <label className="field">
           <span className="field__label">Resolution</span>
           <select
@@ -224,14 +255,6 @@ export function SettingsRail({ state }: { state: PaneState }): React.JSX.Element
           />
           <span>Transparent background (alpha in NDI)</span>
         </label>
-        <label className="check">
-          <input
-            type="checkbox"
-            checked={config.localAudio}
-            onChange={(e) => apply({ localAudio: e.target.checked })}
-          />
-          <span>Play audio on this machine</span>
-        </label>
         <label className="check" title="Adds a nearly invisible noise layer to the page to break up banding in gradients">
           <input
             type="checkbox"
@@ -248,6 +271,24 @@ export function SettingsRail({ state }: { state: PaneState }): React.JSX.Element
           />
           <span>Show mouse cursor in output</span>
         </label>
+        <p className="card__note">
+          {presenter
+            ? 'Transparent background applies to studio mode only (hidden window).'
+            : 'Toggling transparent background rebuilds the browser window — the page reloads.'}
+        </p>
+      </section>
+
+      <section className="card">
+        <h2 className="card__title">This app</h2>
+        <p className="card__note">These don't change the NDI output — local to this window.</p>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={config.localAudio}
+            onChange={(e) => apply({ localAudio: e.target.checked })}
+          />
+          <span>Play audio on this machine</span>
+        </label>
         <label className="check" title="Turn off the in-app preview to save some CPU (does not affect the NDI output)">
           <input
             type="checkbox"
@@ -256,11 +297,6 @@ export function SettingsRail({ state }: { state: PaneState }): React.JSX.Element
           />
           <span>Show preview in the app</span>
         </label>
-        <p className="card__note">
-          {presenter
-            ? 'Transparent background applies to studio mode only (hidden window).'
-            : 'Toggling transparent background rebuilds the browser window — the page reloads.'}
-        </p>
       </section>
 
       <section className="card">

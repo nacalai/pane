@@ -262,6 +262,23 @@ body {
 .btn--stop:hover:not(:disabled) {
   background: #e04434;
 }
+.btn--confirm {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: var(--dark);
+  animation: confirmpulse 1s ease-in-out infinite;
+}
+@keyframes confirmpulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 178, 62, 0.5); }
+  50% { box-shadow: 0 0 0 5px rgba(255, 178, 62, 0); }
+}
+.btn--spin {
+  animation: btnspin 0.9s linear infinite;
+}
+@keyframes btnspin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
 .btn--active {
   background: var(--blue);
   border-color: var(--blue);
@@ -527,4 +544,14 @@ body {
 }
 .stats--static {
   color: var(--amber);
+}
+.stats--dim {
+  color: rgba(255, 255, 255, 0.3);
+}
+.stats--dim b {
+  color: rgba(255, 255, 255, 0.5);
+}
+.stats__hint {
+  color: rgba(255, 255, 255, 0.28);
+  margin-left: 6px;
 }

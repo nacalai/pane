@@ -253,7 +253,7 @@ export class PaneCapture extends EventEmitter<CaptureEvents> {
       } else {
         this.failure = {
           code: 0,
-          description: `Nettleserprosessen krasjet gjentatte ganger (${details.reason})`,
+          description: `The browser process crashed repeatedly (${details.reason})`,
           url: this.currentTarget
         }
         this.loadErrorCard()

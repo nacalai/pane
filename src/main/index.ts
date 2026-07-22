@@ -100,10 +100,10 @@ function teardown(): void {
 // native faults still crash the process; nothing in JS can prevent those.) Real teardown
 // happens only on deliberate quit (before-quit).
 process.on('uncaughtException', (err) => {
-  console.error('[main] uncaughtException (holder Pane i live):', err)
+  console.error('[main] uncaughtException (keeping Pane live):', err)
 })
 process.on('unhandledRejection', (reason) => {
-  console.error('[main] unhandledRejection (holder Pane i live):', reason)
+  console.error('[main] unhandledRejection (keeping Pane live):', reason)
 })
 
 if (!app.requestSingleInstanceLock()) {
