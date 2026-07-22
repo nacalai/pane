@@ -42,6 +42,9 @@ function setupAutoUpdate(): void {
   autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = true
   autoUpdater.fullChangelog = false
+  // Releases are tagged as pre-release (beta), so the updater must consider pre-releases —
+  // otherwise it looks only at the (non-existent) 'latest' stable release and finds nothing.
+  autoUpdater.allowPrerelease = true
   pane.onUpdateActions({
     download: () => {
       void autoUpdater.downloadUpdate().catch((e: Error) => console.error('[update] download:', e.message))
