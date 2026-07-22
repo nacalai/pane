@@ -2,8 +2,11 @@
  * IPC boundary. Every inbound payload is zod-parsed; results are
  * { ok } | { ok:false, error } unions — nothing ever throws across IPC.
  */
-import { ipcMain } from 'electron'
+import { ipcMain, shell } from 'electron'
 import type { PaneApp } from './app'
+
+/** External links the app is allowed to open in the default browser (allowlist). */
+const ALLOWED_EXTERNAL = ['https://github.com/nacalai/pane', 'https://ndi.video']
 import {
   InputEventSchema,
   NavActionSchema,
@@ -92,5 +95,14 @@ export function registerIpc(app: PaneApp): void {
   ipcMain.handle('pane:update-restart', () => {
     app.restartForUpdate()
     return { ok: true, data: null }
+  })
+  // Open a whitelisted external link in the default browser.
+  ipcMain.handle('pane:open-external', (_e, raw: unknown) => {
+    const url = typeof raw === 'string' ? raw : ''
+    if (ALLOWED_EXTERNAL.some((p) => url === p || url.startsWith(p + '/') || url.startsWith(p + '#'))) {
+      void shell.openExternal(url)
+      return { ok: true, data: null }
+    }
+    return { ok: false, error: 'link not allowed' }
   })
 }

@@ -42,11 +42,7 @@ export function TopBar({ state }: { state: PaneState }): React.JSX.Element {
       ? { cls: 'tally tally--start', text: 'START NDI', title: 'Publish this page as an NDI source' }
       : armed
         ? { cls: 'tally tally--arm', text: 'CLICK AGAIN TO STOP', title: 'Confirm — takes the source off air' }
-        : {
-            cls: 'tally tally--live',
-            text: state.receivers > 0 ? '● ON AIR · SEEN' : '● ON AIR',
-            title: 'Live — click to stop (guarded)'
-          }
+        : { cls: 'tally tally--live', text: '● ON AIR', title: 'Live — click to stop (guarded)' }
 
   return (
     <header className="topbar">
@@ -57,10 +53,17 @@ export function TopBar({ state }: { state: PaneState }): React.JSX.Element {
         <span className="topbar__tag">webpage → NDI</span>
       </div>
       <div className="topbar__console">
-        <span className="ndi-chip" title={cleanVersion(state.ndiVersion)}>
-          <span className="ndi-chip__label">NDI</span>
-          <span className="ndi-chip__name">{state.config.ndiName}</span>
+        <span className="topbar__source" title={`NDI source · ${cleanVersion(state.ndiVersion)}`}>
+          {state.config.ndiName}
         </span>
+        {live && (
+          <span
+            className={`topbar__conn ${state.receivers > 0 ? 'topbar__conn--on' : ''}`}
+            title="NDI connections (one receiver such as vMix/OBS opens ~2)"
+          >
+            {state.receivers} connected
+          </span>
+        )}
         <button
           className={control.cls}
           title={control.title}

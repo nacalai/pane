@@ -2,9 +2,12 @@ import { useState } from 'react'
 import type { Fps, PaneState } from '@shared/schema'
 
 const PRESETS: Array<{ label: string; w: number; h: number }> = [
-  { label: '1920 × 1080', w: 1920, h: 1080 },
-  { label: '1280 × 720', w: 1280, h: 720 },
-  { label: '3840 × 2160', w: 3840, h: 2160 }
+  { label: '1920 × 1080 · 16:9', w: 1920, h: 1080 },
+  { label: '1280 × 720 · 16:9', w: 1280, h: 720 },
+  { label: '3840 × 2160 · 4K', w: 3840, h: 2160 },
+  { label: '1440 × 1080 · 4:3', w: 1440, h: 1080 },
+  { label: '1080 × 1080 · 1:1', w: 1080, h: 1080 },
+  { label: '1080 × 1920 · 9:16', w: 1080, h: 1920 }
 ]
 const FPS_OPTIONS: Fps[] = [25, 30, 50, 60]
 type Tab = 'output' | 'presenter' | 'remote' | 'app'
@@ -213,7 +216,7 @@ export function SettingsRail({ state }: { state: PaneState }): React.JSX.Element
             )}
             <p className="card__note">
               {config.showCursor
-                ? 'The OS cursor is hidden so only this one shows (no double cursor).'
+                ? 'Drawn onto the output frame, so it follows the mouse everywhere. The presenter still uses the real OS cursor in their own window.'
                 : 'Off: the presenter uses the real mouse (zero latency); the output has no pointer.'}
             </p>
           </section>
@@ -328,11 +331,19 @@ export function SettingsRail({ state }: { state: PaneState }): React.JSX.Element
                 )}
                 {state.httpError && <div className="rail__error">{state.httpError}</div>}
                 <p className="card__note code-note">
-                  GET /api/key?key=ArrowRight · /api/scroll?dy=600 · /api/go?url=… · /api/nav/back ·
-                  /api/testcard · /api/presenter/open?fullscreen=1 · /api/status
-                  <br />
-                  http://127.0.0.1:{config.httpPort}/api/…
+                  Base: http://127.0.0.1:{config.httpPort}/api/… — e.g. /api/go?url=… ·
+                  /api/key?key=ArrowRight · /api/presenter/open?fullscreen=1 · /api/status
                 </p>
+                <button
+                  className="linkbtn"
+                  onClick={() =>
+                    void window.pane.openExternal(
+                      'https://github.com/nacalai/pane#remote-control-stream-deck--companion'
+                    )
+                  }
+                >
+                  See all API commands &amp; usage ↗
+                </button>
               </>
             )}
           </section>
@@ -368,18 +379,20 @@ export function SettingsRail({ state }: { state: PaneState }): React.JSX.Element
 
           <section className="card">
             <h2 className="card__title">This window</h2>
-            <p className="card__note">These don't change the NDI output — local to this window.</p>
-            <label className="check">
+            <label
+              className="check"
+              title="Play the page's sound on this computer's speakers. This does NOT go over NDI — NDI audio isn't supported yet."
+            >
               <input
                 type="checkbox"
                 checked={config.localAudio}
                 onChange={(e) => apply({ localAudio: e.target.checked })}
               />
-              <span>Play audio on this machine</span>
+              <span>Play page audio on this computer</span>
             </label>
             <label
               className="check"
-              title="Turn off the in-app preview to save some CPU (does not affect the NDI output)"
+              title="Hide the preview to give the settings more room — does not affect the NDI output"
             >
               <input
                 type="checkbox"
@@ -388,6 +401,46 @@ export function SettingsRail({ state }: { state: PaneState }): React.JSX.Element
               />
               <span>Show preview in the app</span>
             </label>
+            <p className="card__note">
+              Audio plays locally only (not over NDI). Hiding the preview gives the settings more
+              space and saves a little CPU — the NDI output is unaffected.
+            </p>
+          </section>
+
+          <section className="card">
+            <h2 className="card__title">NDI details</h2>
+            <dl className="ndistats">
+              <dt>Codec</dt>
+              <dd>SpeedHQ (full‑bandwidth NDI)</dd>
+              <dt>Pixel format</dt>
+              <dd>{config.transparent ? 'BGRA · with alpha' : 'BGRX · opaque'} · 8‑bit 4:2:2</dd>
+              <dt>Resolution</dt>
+              <dd>
+                {config.width}×{config.height} @ {config.fps} fps
+              </dd>
+              <dt>Sending</dt>
+              <dd>{state.ndi === 'live' ? `${state.sentFps.toFixed(1)} fps` : 'off'}</dd>
+              <dt>Bandwidth</dt>
+              <dd>~{Math.round((config.width * config.height * config.fps * 2) / 1e6)} Mbps (est.)</dd>
+              <dt>Connections</dt>
+              <dd>{state.receivers} (~2 per receiver)</dd>
+              {state.ndiVersion && (
+                <>
+                  <dt>Runtime</dt>
+                  <dd>{state.ndiVersion.replace(/^NDI SDK\s*/i, '').replace(/WIN64.*?(\d)/i, '$1')}</dd>
+                </>
+              )}
+            </dl>
+          </section>
+
+          <section className="card card--about">
+            <span className="about__beta">BETA</span>
+            <button
+              className="linkbtn"
+              onClick={() => void window.pane.openExternal('https://github.com/nacalai/pane')}
+            >
+              Pane on GitHub ↗
+            </button>
           </section>
         </div>
       )}

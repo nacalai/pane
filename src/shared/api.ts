@@ -15,6 +15,7 @@ export interface PaneApi {
   setSettings: (patch: SettingsPatch) => Promise<IpcResult>
   getState: () => Promise<IpcResult<PaneState>>
   sendInput: (ev: InputEventReq) => void
+  openExternal: (url: string) => Promise<IpcResult>
   updateDownload: () => Promise<IpcResult>
   updateLater: () => Promise<IpcResult>
   updateSkip: () => Promise<IpcResult>

@@ -23,6 +23,7 @@ const api = {
   sendInput: (ev: unknown) => {
     ipcRenderer.send('pane:input', ev)
   },
+  openExternal: (url: string) => ipcRenderer.invoke('pane:open-external', url),
   updateDownload: () => ipcRenderer.invoke('pane:update-download'),
   updateLater: () => ipcRenderer.invoke('pane:update-later'),
   updateSkip: () => ipcRenderer.invoke('pane:update-skip'),

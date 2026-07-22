@@ -48,8 +48,10 @@ export default function App(): React.JSX.Element {
       <TopBar state={state} />
       {state.update && <UpdateBanner update={state.update} />}
       <UrlBar state={state} />
-      <div className="main">
-        <Preview state={state} previewUrl={previewUrl} cursor={cursor} />
+      <div className={`main ${state.config.showPreview ? '' : 'main--nopreview'}`}>
+        {state.config.showPreview && (
+          <Preview state={state} previewUrl={previewUrl} cursor={cursor} />
+        )}
         <SettingsRail state={state} />
       </div>
       <StatsStrip state={state} />
