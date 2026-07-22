@@ -152,6 +152,16 @@ if (!app.requestSingleInstanceLock()) {
     pane.onLoginItemChange((cfg) => syncLoginItem(cfg.launchAtLogin))
     control.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
     control.webContents.on('will-navigate', (event) => event.preventDefault())
+    // Never reload the control UI on F5/Ctrl+R — the renderer maps those keys to reloading
+    // the Pane *page* instead. Reloading the control window would just be a jarring flash.
+    control.webContents.on('before-input-event', (event, input) => {
+      if (
+        input.type === 'keyDown' &&
+        (input.key === 'F5' || (input.control && input.key.toLowerCase() === 'r'))
+      ) {
+        event.preventDefault()
+      }
+    })
 
     // The X button never quits — it hides the control UI to the tray while NDI
     // keeps streaming. Quitting is deliberate, only from the tray menu (which
