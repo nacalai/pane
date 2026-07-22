@@ -72,6 +72,16 @@ async function main() {
     p_metadata: 'char*',
     timestamp: 'int64'
   });
+  const NDIlib_audio_frame_v2_t = koffi.struct('NDIlib_audio_frame_v2_t', {
+    sample_rate: 'int',
+    no_channels: 'int',
+    no_samples: 'int',
+    timecode: 'int64',
+    p_data: 'float*',
+    channel_stride_in_bytes: 'int',
+    p_metadata: 'char*',
+    timestamp: 'int64'
+  });
 
   const fns = {
     initialize: lib.func('bool NDIlib_initialize()'),
@@ -82,9 +92,10 @@ async function main() {
     recv_create: lib.func('void* NDIlib_recv_create_v3(NDIlib_recv_create_v3_t* p)'),
     recv_destroy: lib.func('void NDIlib_recv_destroy(void* p)'),
     recv_capture: lib.func(
-      'int NDIlib_recv_capture_v2(void* p, _Out_ NDIlib_video_frame_v2_t* v, void* a, void* m, uint32_t timeout)'
+      'int NDIlib_recv_capture_v2(void* p, _Out_ NDIlib_video_frame_v2_t* v, _Out_ NDIlib_audio_frame_v2_t* a, void* m, uint32_t timeout)'
     ),
-    recv_free_video: lib.func('void NDIlib_recv_free_video_v2(void* p, NDIlib_video_frame_v2_t* v)')
+    recv_free_video: lib.func('void NDIlib_recv_free_video_v2(void* p, NDIlib_video_frame_v2_t* v)'),
+    recv_free_audio: lib.func('void NDIlib_recv_free_audio_v2(void* p, NDIlib_audio_frame_v2_t* a)')
   };
 
   if (!fns.initialize()) throw new Error('NDIlib_initialize failed');
@@ -126,7 +137,10 @@ async function main() {
   });
   if (!recv) throw new Error('recv_create failed');
 
+  const FRAME_TYPE_AUDIO = 2;
   let frames = 0;
+  let audioFrames = 0;
+  let audioInfo = null;
   let last = null;
   let lastPixels = null;
   const captureStart = Date.now();
@@ -135,7 +149,8 @@ async function main() {
 
   while (Date.now() < deadline) {
     const v = {};
-    const t = fns.recv_capture(recv, v, null, null, 1000);
+    const a = {};
+    const t = fns.recv_capture(recv, v, a, null, 1000);
     if (t === FRAME_TYPE_VIDEO) {
       frames++;
       if (firstFrameAt === null) firstFrameAt = Date.now();
@@ -153,6 +168,10 @@ async function main() {
         };
       }
       fns.recv_free_video(recv, v);
+    } else if (t === FRAME_TYPE_AUDIO) {
+      audioFrames++;
+      audioInfo = { sampleRate: a.sample_rate, channels: a.no_channels, samples: a.no_samples };
+      fns.recv_free_audio(recv, a);
     }
   }
 
@@ -165,7 +184,9 @@ async function main() {
     frames,
     fps: frames > 0 ? Math.round((frames / activeSecs) * 10) / 10 : 0,
     video: last ? { ...last, fourCCName: fourccName(last.fourCC) } : null,
-    pixels: lastPixels
+    pixels: lastPixels,
+    audioFrames,
+    audio: audioInfo
   };
   console.log(JSON.stringify(result, null, 2));
 

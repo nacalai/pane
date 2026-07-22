@@ -23,6 +23,9 @@ const api = {
   sendInput: (ev: unknown) => {
     ipcRenderer.send('pane:input', ev)
   },
+  sendAudio: (data: ArrayBuffer, sampleRate: number, channels: number, samples: number) => {
+    ipcRenderer.send('pane:audio', data, sampleRate, channels, samples)
+  },
   openExternal: (url: string) => ipcRenderer.invoke('pane:open-external', url),
   updateDownload: () => ipcRenderer.invoke('pane:update-download'),
   updateLater: () => ipcRenderer.invoke('pane:update-later'),

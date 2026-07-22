@@ -181,6 +181,23 @@ export function SettingsRail({ state }: { state: PaneState }): React.JSX.Element
               />
               <span>Reduce banding in gradients (dither)</span>
             </label>
+            <label
+              className="check"
+              title="Send audio over NDI by capturing this computer's audio output (loopback)"
+            >
+              <input
+                type="checkbox"
+                checked={config.ndiAudio}
+                onChange={(e) => apply({ ndiAudio: e.target.checked })}
+              />
+              <span>Send page audio over NDI (loopback)</span>
+            </label>
+            {config.ndiAudio && (
+              <p className="card__note">
+                Loopback captures this computer's <b>whole audio output</b> — the page must be
+                audible (it also plays on your speakers), and other system sounds are included too.
+              </p>
+            )}
           </section>
 
           <section className="card">

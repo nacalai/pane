@@ -92,7 +92,18 @@ export class NdiSender {
         p_metadata: 'char*',
         timestamp: 'int64'
       })
-      this.types = { NDIlib_source_t, NDIlib_video_frame_v2_t }
+      // NDIlib_audio_frame_v2_t — planar 32-bit float (FLTP) audio.
+      const NDIlib_audio_frame_v2_t = koffi.struct('NDIlib_audio_frame_v2_t', {
+        sample_rate: 'int',
+        no_channels: 'int',
+        no_samples: 'int',
+        timecode: 'int64',
+        p_data: 'float*',
+        channel_stride_in_bytes: 'int',
+        p_metadata: 'char*',
+        timestamp: 'int64'
+      })
+      this.types = { NDIlib_source_t, NDIlib_video_frame_v2_t, NDIlib_audio_frame_v2_t }
 
       this.fns = {
         initialize: lib.func('bool NDIlib_initialize()'),
@@ -101,6 +112,7 @@ export class NdiSender {
         send_create: lib.func('void* NDIlib_send_create(NDIlib_send_create_t* p)'),
         send_destroy: lib.func('void NDIlib_send_destroy(void* p)'),
         send_video: lib.func('void NDIlib_send_send_video_v2(void* p, NDIlib_video_frame_v2_t* f)'),
+        send_audio: lib.func('void NDIlib_send_send_audio_v2(void* p, NDIlib_audio_frame_v2_t* f)'),
         send_connections: lib.func('int NDIlib_send_get_no_connections(void* p, uint32_t timeout_ms)'),
         find_create: lib.func('void* NDIlib_find_create_v2(NDIlib_find_create_t* p)'),
         find_destroy: lib.func('void NDIlib_find_destroy(void* p)'),
@@ -195,6 +207,27 @@ export class NdiSender {
       timecode,
       p_data: bgra,
       line_stride_in_bytes: w * 4,
+      p_metadata: null,
+      timestamp: 0n
+    })
+    return true
+  }
+
+  /**
+   * Push one planar float32 (FLTP) audio frame. `planar` holds channel 0's samples, then
+   * channel 1's, … each `samples` floats long. Timecode is synthesized (SDK-clocked) so audio
+   * rides alongside video without us managing A/V sync tightly.
+   */
+  sendAudio(planar: Buffer, sampleRate: number, channels: number, samples: number): boolean {
+    if (!this.fns || !this.send) return false
+    if (planar.byteLength !== channels * samples * 4) return false
+    this.fns.send_audio!(this.send, {
+      sample_rate: sampleRate,
+      no_channels: channels,
+      no_samples: samples,
+      timecode: 0x7fffffffffffffffn, // NDIlib_send_timecode_synthesize
+      p_data: planar,
+      channel_stride_in_bytes: samples * 4,
       p_metadata: null,
       timestamp: 0n
     })

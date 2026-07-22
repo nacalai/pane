@@ -79,6 +79,20 @@ export function registerIpc(app: PaneApp): void {
     const parsed = InputEventSchema.safeParse(raw)
     if (parsed.success) app.capture.injectInput(parsed.data)
   })
+  // High-rate loopback audio frames from the renderer (planar float32) → NDI.
+  ipcMain.on('pane:audio', (_event, data: unknown, sampleRate: unknown, channels: unknown, samples: unknown) => {
+    if (
+      data instanceof ArrayBuffer &&
+      typeof sampleRate === 'number' &&
+      typeof channels === 'number' &&
+      typeof samples === 'number' &&
+      channels > 0 &&
+      channels <= 8 &&
+      samples > 0
+    ) {
+      app.pushAudio(Buffer.from(data), sampleRate, channels, samples)
+    }
+  })
   // Update actions (no payload).
   ipcMain.handle('pane:update-download', () => {
     app.requestUpdateDownload()

@@ -80,6 +80,13 @@ export class PaneApp {
     this.updateActions?.restart()
   }
 
+  /** Planar float32 loopback audio from the renderer → NDI (only while enabled + live). */
+  pushAudio(planar: Buffer, sampleRate: number, channels: number, samples: number): void {
+    if (this.config.ndiAudio && this.sender.isLive()) {
+      this.sender.sendAudio(planar, sampleRate, channels, samples)
+    }
+  }
+
   /** index.ts feeds the connected-monitor list here (and on hotplug). */
   setDisplays(displays: DisplayInfo[]): void {
     this.displays = displays

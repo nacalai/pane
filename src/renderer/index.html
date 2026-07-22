@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="no">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <!-- CSP for the control UI. It renders no remote/untrusted HTML; 'unsafe-inline'
@@ -7,7 +7,7 @@
          accepted trade-off for a local tool whose only scripts are our own bundle. -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' blob: data:; connect-src 'self' ws:"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' blob: data:; connect-src 'self' ws: blob:"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />

@@ -34,6 +34,7 @@ export interface PaneConfig {
   fps: Fps
   transparent: boolean
   localAudio: boolean
+  ndiAudio: boolean
   autoStart: boolean
   dither: boolean
   showPreview: boolean
@@ -62,6 +63,7 @@ export const DEFAULT_CONFIG: PaneConfig = {
   fps: 30,
   transparent: false,
   localAudio: false,
+  ndiAudio: false,
   autoStart: true,
   dither: false,
   showPreview: true,
@@ -92,6 +94,7 @@ export const SettingsPatchSchema = z
     fps: fpsSchema,
     transparent: z.boolean(),
     localAudio: z.boolean(),
+    ndiAudio: z.boolean(),
     autoStart: z.boolean(),
     dither: z.boolean(),
     showPreview: z.boolean(),

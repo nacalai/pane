@@ -253,7 +253,8 @@ export class PaneCapture extends EventEmitter<CaptureEvents> {
     this.win = win
     const contents = win.webContents
     if (!presenter) contents.setFrameRate(this.cfg.fps)
-    contents.setAudioMuted(!this.cfg.localAudio)
+    // NDI audio via loopback needs the page audible on the system, so unmute for either.
+    contents.setAudioMuted(!(this.cfg.localAudio || this.cfg.ndiAudio))
 
     if (presenter) {
       win.setMenuBarVisibility(false)
@@ -660,8 +661,8 @@ export class PaneCapture extends EventEmitter<CaptureEvents> {
       if (next.mode === 'studio') this.contents?.setFrameRate(next.fps)
       this.startLoops()
     }
-    if (next.localAudio !== prev.localAudio) {
-      this.contents?.setAudioMuted(!next.localAudio)
+    if (next.localAudio !== prev.localAudio || next.ndiAudio !== prev.ndiAudio) {
+      this.contents?.setAudioMuted(!(next.localAudio || next.ndiAudio))
     }
     if (next.dither !== prev.dither) {
       if (next.dither) this.applyDither()

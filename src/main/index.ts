@@ -4,7 +4,7 @@
  * Offscreen rendering (CPU path) requires hardware acceleration OFF and a
  * forced 1x device scale so paint buffers match the configured resolution.
  */
-import { app, BrowserWindow, Menu, nativeImage, screen, Tray } from 'electron'
+import { app, BrowserWindow, desktopCapturer, Menu, nativeImage, screen, session, Tray } from 'electron'
 import electronUpdater from 'electron-updater'
 import type { DisplayInfo } from '@shared/schema'
 
@@ -256,6 +256,17 @@ if (!app.requestSingleInstanceLock()) {
     pane.attachControl(control)
     registerIpc(pane)
     pane.startHttp()
+    // Provide a loopback audio source to the control renderer's getDisplayMedia (for NDI audio).
+    // Video is required by the API but the renderer stops that track immediately.
+    session.defaultSession.setDisplayMediaRequestHandler(
+      (_request, callback) => {
+        desktopCapturer
+          .getSources({ types: ['screen'] })
+          .then((sources) => callback(sources[0] ? { video: sources[0], audio: 'loopback' } : {}))
+          .catch(() => callback({}))
+      },
+      { useSystemPicker: false }
+    )
     // Feed the monitor list now and whenever it changes (plug/unplug/rearrange).
     pane.setDisplays(readDisplays())
     const refreshDisplays = (): void => pane?.setDisplays(readDisplays())

@@ -108,6 +108,13 @@ describe('IPC schemas', () => {
     expect(SettingsPatchSchema.safeParse({ showCursor: 1 }).success).toBe(false)
   })
 
+  it('validates the audio flags', () => {
+    expect(parseConfig(undefined).ndiAudio).toBe(false)
+    expect(parseConfig({ ndiAudio: true }).ndiAudio).toBe(true)
+    expect(SettingsPatchSchema.safeParse({ ndiAudio: true }).success).toBe(true)
+    expect(SettingsPatchSchema.safeParse({ ndiAudio: 'on' }).success).toBe(false)
+  })
+
   it('validates cursor style + color', () => {
     expect(parseConfig(undefined).cursorStyle).toBe('dot')
     expect(parseConfig(undefined).cursorColor).toBe('#FF5A47')

@@ -6,11 +6,22 @@ import { Preview } from './components/Preview'
 import { SettingsRail } from './components/SettingsRail'
 import { StatsStrip } from './components/StatsStrip'
 import { UpdateBanner } from './components/UpdateBanner'
+import { NdiAudioCapture } from './audio'
+
+const audioCapture = new NdiAudioCapture()
 
 export default function App(): React.JSX.Element {
   const [state, setState] = useState<PaneState | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [cursor, setCursor] = useState('default')
+
+  // Start/stop loopback audio capture when NDI audio is toggled.
+  const ndiAudio = state?.config.ndiAudio ?? false
+  useEffect(() => {
+    if (ndiAudio) void audioCapture.start()
+    else audioCapture.stop()
+    return () => audioCapture.stop()
+  }, [ndiAudio])
 
   useEffect(() => {
     const off = window.pane.onState((s) => setState(s))
