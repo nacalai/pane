@@ -23,6 +23,9 @@ export type Fps = (typeof FPS_VALUES)[number]
  */
 export type PaneMode = 'studio' | 'presenter'
 
+/** In-output cursor: 'arrow' = normal mouse pointer, 'dot' = a colored circle (laser pointer). */
+export type CursorStyle = 'arrow' | 'dot'
+
 export interface PaneConfig {
   url: string
   ndiName: string
@@ -35,6 +38,8 @@ export interface PaneConfig {
   dither: boolean
   showPreview: boolean
   showCursor: boolean
+  cursorStyle: CursorStyle
+  cursorColor: string
   mode: PaneMode
   presenterFullscreen: boolean
   presenterDisplayId: number
@@ -60,6 +65,8 @@ export const DEFAULT_CONFIG: PaneConfig = {
   dither: false,
   showPreview: true,
   showCursor: false,
+  cursorStyle: 'dot',
+  cursorColor: '#FF5A47',
   mode: 'studio',
   presenterFullscreen: false,
   presenterDisplayId: 0,
@@ -87,6 +94,8 @@ export const SettingsPatchSchema = z
     dither: z.boolean(),
     showPreview: z.boolean(),
     showCursor: z.boolean(),
+    cursorStyle: z.enum(['arrow', 'dot']),
+    cursorColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
     mode: z.enum(['studio', 'presenter']),
     presenterFullscreen: z.boolean(),
     // 0 = follow primary display; otherwise an Electron display id.

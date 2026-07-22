@@ -108,6 +108,16 @@ describe('IPC schemas', () => {
     expect(SettingsPatchSchema.safeParse({ showCursor: 1 }).success).toBe(false)
   })
 
+  it('validates cursor style + color', () => {
+    expect(parseConfig(undefined).cursorStyle).toBe('dot')
+    expect(parseConfig(undefined).cursorColor).toBe('#FF5A47')
+    expect(SettingsPatchSchema.safeParse({ cursorStyle: 'arrow' }).success).toBe(true)
+    expect(SettingsPatchSchema.safeParse({ cursorStyle: 'circle' }).success).toBe(false)
+    expect(SettingsPatchSchema.safeParse({ cursorColor: '#00ff88' }).success).toBe(true)
+    expect(SettingsPatchSchema.safeParse({ cursorColor: 'red' }).success).toBe(false)
+    expect(SettingsPatchSchema.safeParse({ cursorColor: '#fff' }).success).toBe(false)
+  })
+
   it('validates the presenter display id', () => {
     expect(SettingsPatchSchema.safeParse({ presenterDisplayId: 0 }).success).toBe(true)
     expect(SettingsPatchSchema.safeParse({ presenterDisplayId: 667457223 }).success).toBe(true)

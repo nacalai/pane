@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import type { Fps, PaneState } from '@shared/schema'
 
 const PRESETS: Array<{ label: string; w: number; h: number }> = [
@@ -7,21 +7,21 @@ const PRESETS: Array<{ label: string; w: number; h: number }> = [
   { label: '3840 × 2160', w: 3840, h: 2160 }
 ]
 const FPS_OPTIONS: Fps[] = [25, 30, 50, 60]
+type Tab = 'output' | 'presenter' | 'remote' | 'app'
+const TABS: Array<{ id: Tab; label: string }> = [
+  { id: 'output', label: 'Output' },
+  { id: 'presenter', label: 'Presenter' },
+  { id: 'remote', label: 'Remote' },
+  { id: 'app', label: 'App' }
+]
 
 export function SettingsRail({ state }: { state: PaneState }): React.JSX.Element {
   const { config } = state
+  const [tab, setTab] = useState<Tab>('output')
   const [customW, setCustomW] = useState(String(config.width))
   const [customH, setCustomH] = useState(String(config.height))
   const [showCustom, setShowCustom] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // STOP is guarded: first click arms, a second click within the window actually stops.
-  const [stopArmed, setStopArmed] = useState(false)
-  const stopTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  useEffect(() => {
-    return () => {
-      if (stopTimer.current) clearTimeout(stopTimer.current)
-    }
-  }, [])
 
   const apply = (patch: Record<string, unknown>): void => {
     setError(null)
@@ -43,326 +43,354 @@ export function SettingsRail({ state }: { state: PaneState }): React.JSX.Element
     apply({ width: w, height: h })
   }
 
-  const live = state.ndi === 'live'
   const presenter = config.mode === 'presenter'
-
-  const disarmStop = (): void => {
-    if (stopTimer.current) clearTimeout(stopTimer.current)
-    stopTimer.current = null
-    setStopArmed(false)
-  }
-  const onNdiButton = (): void => {
-    if (!live) {
-      void window.pane.start()
-      return
-    }
-    if (!stopArmed) {
-      // First click while live only arms — prevents a stray click dropping the feed.
-      setStopArmed(true)
-      stopTimer.current = setTimeout(() => setStopArmed(false), 3000)
-      return
-    }
-    disarmStop()
-    void window.pane.stop()
-  }
 
   return (
     <aside className="rail">
-      <section className="card">
-        <h2 className="card__title">NDI output</h2>
-        <label className="field">
-          <span className="field__label">Source name</span>
-          <input
-            key={config.ndiName}
-            className="field__input"
-            type="text"
-            defaultValue={config.ndiName}
-            maxLength={63}
-            onBlur={(e) => {
-              if (e.target.value !== config.ndiName) apply({ ndiName: e.target.value })
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-            }}
-          />
-        </label>
-        <button
-          className={`btn btn--big ${live ? (stopArmed ? 'btn--confirm' : 'btn--stop') : 'btn--primary'}`}
-          disabled={state.ndi === 'no-runtime'}
-          title={state.ndi === 'no-runtime' ? 'NDI runtime not installed' : undefined}
-          onClick={onNdiButton}
-          onMouseLeave={disarmStop}
-        >
-          {!live ? 'START NDI' : stopArmed ? 'CLICK AGAIN TO STOP' : 'STOP NDI'}
-        </button>
-        <label className="check">
-          <input
-            type="checkbox"
-            checked={config.autoStart}
-            onChange={(e) => apply({ autoStart: e.target.checked })}
-          />
-          <span>Start NDI on launch</span>
-        </label>
-      </section>
-
-      <section className="card">
-        <h2 className="card__title">Startup</h2>
-        <label className="check">
-          <input
-            type="checkbox"
-            checked={config.launchAtLogin}
-            onChange={(e) => apply({ launchAtLogin: e.target.checked })}
-          />
-          <span>Start with Windows (hidden in tray)</span>
-        </label>
-        <label className="check">
-          <input
-            type="checkbox"
-            checked={config.startMinimized}
-            onChange={(e) => apply({ startMinimized: e.target.checked })}
-          />
-          <span>Start minimized to tray</span>
-        </label>
-        <p className="card__note">
-          The close button (X) doesn't quit — it minimizes to the system tray where NDI keeps
-          running. Right-click the tray icon to quit. "Start with Windows" only works in the
-          installed app.
-        </p>
-      </section>
-
-      <section className="card">
-        <h2 className="card__title">Presenter view</h2>
-        <p className="card__note">
-          Open the page in a visible window the presenter controls directly — clicks, charts,
-          forms. NDI sends exactly the same image. F11 toggles fullscreen; Esc exits fullscreen.
-        </p>
-        <label className="field">
-          <span className="field__label">Display</span>
-          <select
-            className="field__input"
-            value={config.presenterDisplayId}
-            onChange={(e) => apply({ presenterDisplayId: Number(e.target.value) })}
-          >
-            <option value={0}>Primary display (auto)</option>
-            {state.displays.map((d, i) => (
-              <option key={d.id} value={d.id}>
-                Display {i + 1}
-                {d.primary ? ' (primary)' : ''} — {d.label} {d.width}×{d.height}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="btn-row">
+      <nav className="tabs" role="tablist">
+        {TABS.map((t) => (
           <button
-            className={`btn ${presenter && !state.presenterFullscreen ? 'btn--active' : ''}`}
-            onClick={() => apply({ mode: 'presenter', presenterFullscreen: false })}
+            key={t.id}
+            role="tab"
+            aria-selected={tab === t.id}
+            className={`tab ${tab === t.id ? 'tab--active' : ''}`}
+            onClick={() => setTab(t.id)}
           >
-            Open windowed
+            {t.label}
           </button>
-          <button
-            className={`btn ${presenter && state.presenterFullscreen ? 'btn--active' : ''}`}
-            onClick={() => apply({ mode: 'presenter', presenterFullscreen: true })}
-          >
-            Open fullscreen
-          </button>
-        </div>
-        {presenter && (
-          <button className="btn btn--stop" onClick={() => apply({ mode: 'studio' })}>
-            Close presenter (back to studio)
-          </button>
-        )}
-        <p className="card__note">
-          {presenter
-            ? state.presenterFullscreen
-              ? 'Open fullscreen on the selected display.'
-              : 'Open as a window on the selected display.'
-            : 'Studio: the page renders hidden at exact resolution; you control it via the preview.'}
-          {' '}Switching between studio and presenter rebuilds the window — the page reloads.
-        </p>
-      </section>
+        ))}
+      </nav>
 
-      <section className="card">
-        <h2 className="card__title">Output format</h2>
-        <label className="field">
-          <span className="field__label">Resolution</span>
-          <select
-            className="field__input"
-            value={showCustom ? 'custom' : presetValue}
-            onChange={(e) => {
-              if (e.target.value === 'custom') {
-                setShowCustom(true)
-                setCustomW(String(config.width))
-                setCustomH(String(config.height))
-                return
-              }
-              setShowCustom(false)
-              const p = PRESETS.find((x) => x.label === e.target.value)
-              if (p) apply({ width: p.w, height: p.h })
-            }}
-          >
-            {PRESETS.map((p) => (
-              <option key={p.label} value={p.label}>
-                {p.label}
-              </option>
-            ))}
-            <option value="custom">Custom …</option>
-          </select>
-        </label>
-        {(showCustom || presetValue === 'custom') && (
-          <div className="field field--row">
-            <input
-              className="field__input field__input--num"
-              type="number"
-              value={customW}
-              min={320}
-              max={3840}
-              onChange={(e) => setCustomW(e.target.value)}
-            />
-            <span className="field__x">×</span>
-            <input
-              className="field__input field__input--num"
-              type="number"
-              value={customH}
-              min={240}
-              max={2160}
-              onChange={(e) => setCustomH(e.target.value)}
-            />
-            <button className="btn btn--small" onClick={applyCustom}>
-              Apply
-            </button>
-          </div>
-        )}
-        <label className="field">
-          <span className="field__label">Frames per second</span>
-          <select
-            className="field__input"
-            value={config.fps}
-            onChange={(e) => apply({ fps: Number(e.target.value) })}
-          >
-            {FPS_OPTIONS.map((f) => (
-              <option key={f} value={f}>
-                {f} fps
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="check" title={presenter ? 'Only available in studio mode' : undefined}>
-          <input
-            type="checkbox"
-            checked={config.transparent}
-            disabled={presenter}
-            onChange={(e) => apply({ transparent: e.target.checked })}
-          />
-          <span>Transparent background (alpha in NDI)</span>
-        </label>
-        <label className="check" title="Adds a nearly invisible noise layer to the page to break up banding in gradients">
-          <input
-            type="checkbox"
-            checked={config.dither}
-            onChange={(e) => apply({ dither: e.target.checked })}
-          />
-          <span>Reduce banding in gradients (dither)</span>
-        </label>
-        <label className="check" title="Draw a pointer into the NDI output that follows the mouse (useful for a presenter pointing at charts)">
-          <input
-            type="checkbox"
-            checked={config.showCursor}
-            onChange={(e) => apply({ showCursor: e.target.checked })}
-          />
-          <span>Show mouse cursor in output</span>
-        </label>
-        <p className="card__note">
-          {presenter
-            ? 'Transparent background applies to studio mode only (hidden window).'
-            : 'Toggling transparent background rebuilds the browser window — the page reloads.'}
-        </p>
-      </section>
-
-      <section className="card">
-        <h2 className="card__title">This app</h2>
-        <p className="card__note">These don't change the NDI output — local to this window.</p>
-        <label className="check">
-          <input
-            type="checkbox"
-            checked={config.localAudio}
-            onChange={(e) => apply({ localAudio: e.target.checked })}
-          />
-          <span>Play audio on this machine</span>
-        </label>
-        <label className="check" title="Turn off the in-app preview to save some CPU (does not affect the NDI output)">
-          <input
-            type="checkbox"
-            checked={config.showPreview}
-            onChange={(e) => apply({ showPreview: e.target.checked })}
-          />
-          <span>Show preview in the app</span>
-        </label>
-      </section>
-
-      <section className="card">
-        <h2 className="card__title">Remote control · Stream Deck</h2>
-        <label className="check">
-          <input
-            type="checkbox"
-            checked={config.httpEnabled}
-            onChange={(e) => apply({ httpEnabled: e.target.checked })}
-          />
-          <span>HTTP API on</span>
-        </label>
-        {config.httpEnabled && (
-          <>
-            <div className="field field--row">
-              <span className="field__label" style={{ minWidth: 34 }}>
-                Port
-              </span>
+      {tab === 'output' && (
+        <div className="tabpanel">
+          <section className="card">
+            <label className="field">
+              <span className="field__label">NDI source name</span>
               <input
-                key={config.httpPort}
-                className="field__input field__input--num"
-                type="number"
-                min={1024}
-                max={65535}
-                defaultValue={config.httpPort}
+                key={config.ndiName}
+                className="field__input"
+                type="text"
+                defaultValue={config.ndiName}
+                maxLength={63}
                 onBlur={(e) => {
-                  const p = Number(e.target.value)
-                  if (Number.isInteger(p) && p >= 1024 && p <= 65535 && p !== config.httpPort) {
-                    apply({ httpPort: p })
-                  }
+                  if (e.target.value !== config.ndiName) apply({ ndiName: e.target.value })
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
                 }}
               />
-            </div>
+            </label>
             <label className="check">
               <input
                 type="checkbox"
-                checked={config.httpLan}
-                onChange={(e) => apply({ httpLan: e.target.checked })}
+                checked={config.autoStart}
+                onChange={(e) => apply({ autoStart: e.target.checked })}
               />
-              <span>Allow LAN (requires token)</span>
+              <span>Start NDI on launch</span>
             </label>
-            {config.httpLan && (
-              <label className="field">
-                <span className="field__label">Token</span>
+          </section>
+
+          <section className="card">
+            <h2 className="card__title">Format</h2>
+            <label className="field">
+              <span className="field__label">Resolution</span>
+              <select
+                className="field__input"
+                value={showCustom ? 'custom' : presetValue}
+                onChange={(e) => {
+                  if (e.target.value === 'custom') {
+                    setShowCustom(true)
+                    setCustomW(String(config.width))
+                    setCustomH(String(config.height))
+                    return
+                  }
+                  setShowCustom(false)
+                  const p = PRESETS.find((x) => x.label === e.target.value)
+                  if (p) apply({ width: p.w, height: p.h })
+                }}
+              >
+                {PRESETS.map((p) => (
+                  <option key={p.label} value={p.label}>
+                    {p.label}
+                  </option>
+                ))}
+                <option value="custom">Custom …</option>
+              </select>
+            </label>
+            {(showCustom || presetValue === 'custom') && (
+              <div className="field field--row">
                 <input
-                  key={config.httpToken}
-                  className="field__input"
-                  type="text"
-                  placeholder="secret-token"
-                  defaultValue={config.httpToken}
-                  onBlur={(e) => {
-                    if (e.target.value !== config.httpToken) apply({ httpToken: e.target.value })
-                  }}
+                  className="field__input field__input--num"
+                  type="number"
+                  value={customW}
+                  min={320}
+                  max={3840}
+                  onChange={(e) => setCustomW(e.target.value)}
                 />
-              </label>
+                <span className="field__x">×</span>
+                <input
+                  className="field__input field__input--num"
+                  type="number"
+                  value={customH}
+                  min={240}
+                  max={2160}
+                  onChange={(e) => setCustomH(e.target.value)}
+                />
+                <button className="btn btn--small" onClick={applyCustom}>
+                  Apply
+                </button>
+              </div>
             )}
-            {state.httpError && <div className="rail__error">{state.httpError}</div>}
-            <p className="card__note code-note">
-              GET /api/key?key=ArrowRight · /api/scroll?dy=600 · /api/go?url=… ·
-              /api/nav/back · /api/testcard · /api/presenter?fullscreen=1 · /api/status
-              <br />
-              http://127.0.0.1:{config.httpPort}/api/…
+            <label className="field">
+              <span className="field__label">Frames per second</span>
+              <select
+                className="field__input"
+                value={config.fps}
+                onChange={(e) => apply({ fps: Number(e.target.value) })}
+              >
+                {FPS_OPTIONS.map((f) => (
+                  <option key={f} value={f}>
+                    {f} fps
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label
+              className="check"
+              title={presenter ? 'Only available in studio mode' : undefined}
+            >
+              <input
+                type="checkbox"
+                checked={config.transparent}
+                disabled={presenter}
+                onChange={(e) => apply({ transparent: e.target.checked })}
+              />
+              <span>Transparent background (alpha in NDI)</span>
+            </label>
+            <label
+              className="check"
+              title="Adds a nearly invisible noise layer to break up banding in gradients"
+            >
+              <input
+                type="checkbox"
+                checked={config.dither}
+                onChange={(e) => apply({ dither: e.target.checked })}
+              />
+              <span>Reduce banding in gradients (dither)</span>
+            </label>
+          </section>
+
+          <section className="card">
+            <h2 className="card__title">Cursor in output</h2>
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={config.showCursor}
+                onChange={(e) => apply({ showCursor: e.target.checked })}
+              />
+              <span>Show a cursor in the output</span>
+            </label>
+            {config.showCursor && (
+              <div className="field field--row">
+                <select
+                  className="field__input"
+                  value={config.cursorStyle}
+                  onChange={(e) => apply({ cursorStyle: e.target.value })}
+                >
+                  <option value="dot">Colored dot</option>
+                  <option value="arrow">Arrow pointer</option>
+                </select>
+                {config.cursorStyle === 'dot' && (
+                  <input
+                    className="field__color"
+                    type="color"
+                    value={config.cursorColor}
+                    title="Dot color"
+                    onChange={(e) => apply({ cursorColor: e.target.value })}
+                  />
+                )}
+              </div>
+            )}
+            <p className="card__note">
+              {config.showCursor
+                ? 'The OS cursor is hidden so only this one shows (no double cursor).'
+                : 'Off: the presenter uses the real mouse (zero latency); the output has no pointer.'}
             </p>
-          </>
-        )}
-      </section>
+          </section>
+        </div>
+      )}
+
+      {tab === 'presenter' && (
+        <div className="tabpanel">
+          <section className="card">
+            <h2 className="card__title">Presenter view</h2>
+            <p className="card__note">
+              Open the page in a visible window the presenter controls directly — clicks, charts,
+              forms. NDI sends exactly the same image. F11 toggles fullscreen; Esc exits.
+            </p>
+            <label className="field">
+              <span className="field__label">Display</span>
+              <select
+                className="field__input"
+                value={config.presenterDisplayId}
+                onChange={(e) => apply({ presenterDisplayId: Number(e.target.value) })}
+              >
+                <option value={0}>Primary display (auto)</option>
+                {state.displays.map((d, i) => (
+                  <option key={d.id} value={d.id}>
+                    Display {i + 1}
+                    {d.primary ? ' (primary)' : ''} — {d.label} {d.width}×{d.height}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="btn-row">
+              <button
+                className={`btn ${presenter && !state.presenterFullscreen ? 'btn--active' : ''}`}
+                onClick={() => apply({ mode: 'presenter', presenterFullscreen: false })}
+              >
+                Open windowed
+              </button>
+              <button
+                className={`btn ${presenter && state.presenterFullscreen ? 'btn--active' : ''}`}
+                onClick={() => apply({ mode: 'presenter', presenterFullscreen: true })}
+              >
+                Open fullscreen
+              </button>
+            </div>
+            {presenter && (
+              <button className="btn btn--stop" onClick={() => apply({ mode: 'studio' })}>
+                Close presenter (back to studio)
+              </button>
+            )}
+            <p className="card__note">
+              Switching between studio and presenter rebuilds the window — the page reloads.
+            </p>
+          </section>
+        </div>
+      )}
+
+      {tab === 'remote' && (
+        <div className="tabpanel">
+          <section className="card">
+            <h2 className="card__title">Remote control · Stream Deck</h2>
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={config.httpEnabled}
+                onChange={(e) => apply({ httpEnabled: e.target.checked })}
+              />
+              <span>HTTP API on</span>
+            </label>
+            {config.httpEnabled && (
+              <>
+                <div className="field field--row">
+                  <span className="field__label" style={{ minWidth: 34 }}>
+                    Port
+                  </span>
+                  <input
+                    key={config.httpPort}
+                    className="field__input field__input--num"
+                    type="number"
+                    min={1024}
+                    max={65535}
+                    defaultValue={config.httpPort}
+                    onBlur={(e) => {
+                      const p = Number(e.target.value)
+                      if (Number.isInteger(p) && p >= 1024 && p <= 65535 && p !== config.httpPort) {
+                        apply({ httpPort: p })
+                      }
+                    }}
+                  />
+                </div>
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={config.httpLan}
+                    onChange={(e) => apply({ httpLan: e.target.checked })}
+                  />
+                  <span>Allow LAN (requires token)</span>
+                </label>
+                {config.httpLan && (
+                  <label className="field">
+                    <span className="field__label">Token</span>
+                    <input
+                      key={config.httpToken}
+                      className="field__input"
+                      type="text"
+                      placeholder="secret-token"
+                      defaultValue={config.httpToken}
+                      onBlur={(e) => {
+                        if (e.target.value !== config.httpToken) apply({ httpToken: e.target.value })
+                      }}
+                    />
+                  </label>
+                )}
+                {state.httpError && <div className="rail__error">{state.httpError}</div>}
+                <p className="card__note code-note">
+                  GET /api/key?key=ArrowRight · /api/scroll?dy=600 · /api/go?url=… · /api/nav/back ·
+                  /api/testcard · /api/presenter/open?fullscreen=1 · /api/status
+                  <br />
+                  http://127.0.0.1:{config.httpPort}/api/…
+                </p>
+              </>
+            )}
+          </section>
+        </div>
+      )}
+
+      {tab === 'app' && (
+        <div className="tabpanel">
+          <section className="card">
+            <h2 className="card__title">Startup</h2>
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={config.launchAtLogin}
+                onChange={(e) => apply({ launchAtLogin: e.target.checked })}
+              />
+              <span>Start with Windows (hidden in tray)</span>
+            </label>
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={config.startMinimized}
+                onChange={(e) => apply({ startMinimized: e.target.checked })}
+              />
+              <span>Start minimized to tray</span>
+            </label>
+            <p className="card__note">
+              The close button (X) doesn't quit — it minimizes to the system tray where NDI keeps
+              running. Right-click the tray icon to quit. "Start with Windows" only works in the
+              installed app.
+            </p>
+          </section>
+
+          <section className="card">
+            <h2 className="card__title">This window</h2>
+            <p className="card__note">These don't change the NDI output — local to this window.</p>
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={config.localAudio}
+                onChange={(e) => apply({ localAudio: e.target.checked })}
+              />
+              <span>Play audio on this machine</span>
+            </label>
+            <label
+              className="check"
+              title="Turn off the in-app preview to save some CPU (does not affect the NDI output)"
+            >
+              <input
+                type="checkbox"
+                checked={config.showPreview}
+                onChange={(e) => apply({ showPreview: e.target.checked })}
+              />
+              <span>Show preview in the app</span>
+            </label>
+          </section>
+        </div>
+      )}
 
       {error && <div className="rail__error">{error}</div>}
     </aside>

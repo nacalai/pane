@@ -106,10 +106,54 @@ body {
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.42);
 }
-.topbar__status {
+.topbar__console {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+/* On-air control lives in the top bar so it's always visible and gives the bar its purpose. */
+.tally {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  height: 34px;
+  padding: 0 18px;
+  border: 1px solid transparent;
+  border-radius: 0;
+  cursor: pointer;
+  transition: background var(--t-fast), border-color var(--t-fast), box-shadow var(--t-fast);
+}
+.tally:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.tally--start {
+  background: var(--blue);
+  color: #fff;
+}
+.tally--start:hover {
+  background: var(--blue-deep);
+}
+.tally--live {
+  background: var(--coral);
+  color: #fff;
+  box-shadow: 0 0 0 0 rgba(255, 90, 71, 0.55);
+  animation: tallypulse 1.8s ease-in-out infinite;
+}
+@keyframes tallypulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 90, 71, 0.5); }
+  50% { box-shadow: 0 0 0 5px rgba(255, 90, 71, 0); }
+}
+.tally--arm {
+  background: var(--amber);
+  color: var(--dark);
+}
+.tally--off {
+  background: transparent;
+  color: var(--amber);
+  border-color: var(--amber);
+  cursor: default;
 }
 /* NDI source chip — tidy label + name instead of the raw NDI build string */
 .ndi-chip {
@@ -406,11 +450,58 @@ body {
 .rail {
   background: var(--canvas);
   border-left: 1px solid var(--line);
-  padding: 16px;
+  padding: 14px 16px 16px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
+}
+/* Tabs keep each group short enough to avoid scrolling. */
+.tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-input);
+  padding: 3px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.tab {
+  flex: 1;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-input);
+  height: 30px;
+  cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+.tab:hover {
+  color: var(--head);
+}
+.tab--active {
+  background: var(--surface);
+  color: var(--head);
+  box-shadow: 0 1px 3px rgba(8, 12, 18, 0.12);
+}
+.tabpanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.field__color {
+  width: 40px;
+  height: 36px;
+  padding: 2px;
+  border: 1px solid var(--line2);
+  border-radius: var(--r-input);
+  background: var(--surface);
+  cursor: pointer;
 }
 .card {
   background: var(--surface);

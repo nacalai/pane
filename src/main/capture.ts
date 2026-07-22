@@ -57,26 +57,53 @@ const DITHER_CSS =
 
 /**
  * Optional synthetic cursor rendered INTO the page so it appears in the NDI output (the OS
- * cursor and CSS cursor are never captured by OSR/capturePage). A pointer-events:none dot
- * (laser-pointer style — good for a presenter pointing at charts) follows the page's mousemove,
- * which fires for injected moves (studio) and the real mouse (presenter) alike. Injected via
- * executeJavaScript; cleared on navigation, so re-applied on did-finish-load. Idempotent.
- * Pure CSS (no SVG) to avoid quote-escaping issues in the injected source.
+ * cursor and CSS cursor are never captured by OSR/capturePage). A pointer-events:none element
+ * follows the page's mousemove, which fires for injected moves (studio) and the real mouse
+ * (presenter) alike. Two styles: a colored dot (laser pointer) or a normal arrow pointer.
+ *
+ * A companion stylesheet hides the OS cursor (`* {cursor:none}`) — otherwise the presenter's
+ * VISIBLE window shows BOTH the Windows arrow and our synthetic cursor at once. Hiding the OS
+ * cursor makes what the presenter sees match the NDI output exactly.
  */
-const CURSOR_APPLY_JS =
-  '(function(){if(window.__paneCursor)return;' +
-  "var el=document.createElement('div');el.id='__pane-cursor';" +
-  "el.style.cssText='position:fixed;left:-100px;top:-100px;width:16px;height:16px;" +
-  'margin:-8px 0 0 -8px;border-radius:50%;background:rgba(255,90,71,.85);' +
-  "box-shadow:0 0 0 2px #fff,0 1px 6px rgba(0,0,0,.6);pointer-events:none;z-index:2147483647';" +
-  '(document.body||document.documentElement).appendChild(el);' +
-  "var move=function(e){el.style.left=e.clientX+'px';el.style.top=e.clientY+'px'};" +
-  "window.addEventListener('mousemove',move,true);" +
-  'window.__paneCursor=el;window.__paneCursorMove=move;})()'
+const CURSOR_HIDE_CSS = '*{cursor:none !important}'
+
+/** A standard arrow pointer as a base64 data URI (base64 sidesteps quote/# escaping issues). */
+const CURSOR_ARROW_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">' +
+  '<path d="M4 2 L4 19 L9 14.2 L12.2 21 L15.2 19.6 L12 13 L18.5 13 Z" fill="#ffffff" stroke="#111111" stroke-width="1.5" stroke-linejoin="round"/></svg>'
+const CURSOR_ARROW_URI = 'data:image/svg+xml;base64,' + Buffer.from(CURSOR_ARROW_SVG).toString('base64')
+
+function cursorElementCss(style: 'arrow' | 'dot', color: string): string {
+  const base = 'position:fixed;left:-100px;top:-100px;pointer-events:none;z-index:2147483647;'
+  if (style === 'arrow') {
+    return base + `width:24px;height:24px;margin:-2px 0 0 -3px;background:no-repeat left top/contain url("${CURSOR_ARROW_URI}")`
+  }
+  return (
+    base +
+    `width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:${color};` +
+    'box-shadow:0 0 0 2px #fff,0 1px 6px rgba(0,0,0,.6)'
+  )
+}
+
+/** JS that creates-or-restyles the cursor element and wires one mousemove listener. JSON.stringify
+ *  embeds the css safely (handles the url("…") quotes) so re-injecting with a new style/color works. */
+function buildCursorApplyJs(style: 'arrow' | 'dot', color: string): string {
+  const css = cursorElementCss(style, color)
+  return (
+    '(function(){var el=document.getElementById("__pane-cursor");' +
+    'if(!el){el=document.createElement("div");el.id="__pane-cursor";(document.body||document.documentElement).appendChild(el);}' +
+    'el.style.cssText=' +
+    JSON.stringify(css) +
+    ';if(window.__paneCursorX!=null){el.style.left=window.__paneCursorX+"px";el.style.top=window.__paneCursorY+"px";}' +
+    'if(!window.__paneCursorMove){var move=function(e){window.__paneCursorX=e.clientX;window.__paneCursorY=e.clientY;' +
+    'var c=document.getElementById("__pane-cursor");if(c){c.style.left=e.clientX+"px";c.style.top=e.clientY+"px";}};' +
+    'window.addEventListener("mousemove",move,true);window.__paneCursorMove=move;}window.__paneCursor=el;})()'
+  )
+}
 const CURSOR_REMOVE_JS =
   '(function(){if(window.__paneCursorMove){window.removeEventListener("mousemove",window.__paneCursorMove,true)}' +
   'var el=document.getElementById("__pane-cursor");if(el)el.remove();' +
-  'window.__paneCursor=null;window.__paneCursorMove=null;})()'
+  'window.__paneCursor=null;window.__paneCursorMove=null;window.__paneCursorX=null;})()'
 
 export interface CaptureStats {
   sentFps: number
@@ -110,6 +137,7 @@ export class PaneCapture extends EventEmitter<CaptureEvents> {
   private crashReloadTimer: NodeJS.Timeout | null = null
   private disposed = false
   private ditherKey: string | null = null
+  private cursorHideKey: string | null = null
   /** Guards the presenter window's 'closed' event during intentional rebuild/dispose. */
   private tearingWindow = false
 
@@ -225,7 +253,9 @@ export class PaneCapture extends EventEmitter<CaptureEvents> {
     contents.on('page-title-updated', push)
     contents.on('did-finish-load', () => {
       this.crashCount = 0
-      this.ditherKey = null // insertCSS is cleared on navigation; re-apply for the new document
+      // insertCSS is cleared on navigation; re-apply overlays for the new document.
+      this.ditherKey = null
+      this.cursorHideKey = null
       this.applyDither()
       this.applyCursor()
       this.pushNav()
@@ -563,6 +593,11 @@ export class PaneCapture extends EventEmitter<CaptureEvents> {
     if (next.showCursor !== prev.showCursor) {
       if (next.showCursor) this.applyCursor()
       else this.removeCursor()
+    } else if (
+      next.showCursor &&
+      (next.cursorStyle !== prev.cursorStyle || next.cursorColor !== prev.cursorColor)
+    ) {
+      this.applyCursor() // restyle the existing cursor in place
     }
     if (
       next.mode === 'presenter' &&
@@ -659,19 +694,37 @@ export class PaneCapture extends EventEmitter<CaptureEvents> {
     }
   }
 
-  /** Inject the synthetic cursor into the current document so it shows in the NDI output. */
+  /**
+   * Inject the synthetic cursor (element following the mouse) + a stylesheet hiding the OS
+   * cursor, so the output shows our pointer and the presenter's visible window doesn't show a
+   * second (OS) cursor on top. When showCursor is OFF, neither is injected — the presenter uses
+   * the real OS mouse with zero latency and the output simply has no pointer.
+   */
   private applyCursor(): void {
     const contents = this.contents
     if (!contents || !this.cfg.showCursor) return
     contents
-      .executeJavaScript(CURSOR_APPLY_JS, true)
+      .executeJavaScript(buildCursorApplyJs(this.cfg.cursorStyle, this.cfg.cursorColor), true)
       .catch((e: unknown) => console.error('[capture] cursor inject:', (e as Error).message))
+    if (!this.cursorHideKey) {
+      contents
+        .insertCSS(CURSOR_HIDE_CSS)
+        .then((key) => {
+          if (this.cfg.showCursor && this.contents === contents) this.cursorHideKey = key
+          else contents.removeInsertedCSS(key).catch(() => {})
+        })
+        .catch((e: unknown) => console.error('[capture] cursor-hide insertCSS:', (e as Error).message))
+    }
   }
 
   private removeCursor(): void {
-    this.contents?.executeJavaScript(CURSOR_REMOVE_JS, true).catch(() => {
+    const contents = this.contents
+    contents?.executeJavaScript(CURSOR_REMOVE_JS, true).catch(() => {
       /* page may have navigated away — the element is already gone */
     })
+    const key = this.cursorHideKey
+    this.cursorHideKey = null
+    if (contents && key) contents.removeInsertedCSS(key).catch(() => {})
   }
 
   /** Re-place the presenter window if a monitor was added/removed/reconfigured. */

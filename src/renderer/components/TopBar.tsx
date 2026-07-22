@@ -1,22 +1,7 @@
+import { useEffect, useRef, useState } from 'react'
 import type { PaneState } from '@shared/schema'
 
-function pill(state: PaneState): { cls: string; text: string } {
-  switch (state.ndi) {
-    case 'live':
-      // NDI counts TCP connections, not receivers — one receiver (e.g. OBS) opens ~2.
-      return state.receivers > 0
-        ? { cls: 'pill pill--coral', text: '● ON AIR · WATCHED' }
-        : { cls: 'pill pill--mint', text: 'ON AIR' }
-    case 'no-runtime':
-      return { cls: 'pill pill--amber', text: 'NDI RUNTIME MISSING' }
-    case 'error':
-      return { cls: 'pill pill--coral', text: 'NDI ERROR' }
-    default:
-      return { cls: 'pill pill--off', text: 'NDI OFF' }
-  }
-}
-
-/** "NDI SDK WIN64 16:38:09 Apr 14 2026 6.3.2.0" → "NDI 6.3.2.0". */
+/** "NDI SDK WIN64 … 6.3.2.0" → "NDI 6.3.2.0" (shown on hover). */
 function cleanVersion(v: string | null): string {
   if (!v) return 'NDI'
   const m = v.match(/(\d+\.\d+\.\d+(?:\.\d+)?)/)
@@ -24,7 +9,45 @@ function cleanVersion(v: string | null): string {
 }
 
 export function TopBar({ state }: { state: PaneState }): React.JSX.Element {
-  const p = pill(state)
+  const live = state.ndi === 'live'
+  const noRuntime = state.ndi === 'no-runtime'
+  // STOP is guarded: first click arms, a second click within 3s (or before mouse-leave) stops.
+  const [armed, setArmed] = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => void (timer.current && clearTimeout(timer.current)), [])
+
+  const disarm = (): void => {
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = null
+    setArmed(false)
+  }
+  const onControl = (): void => {
+    if (noRuntime) return
+    if (!live) {
+      void window.pane.start()
+      return
+    }
+    if (!armed) {
+      setArmed(true)
+      timer.current = setTimeout(() => setArmed(false), 3000)
+      return
+    }
+    disarm()
+    void window.pane.stop()
+  }
+
+  const control = noRuntime
+    ? { cls: 'tally tally--off', text: 'NDI RUNTIME MISSING', title: 'Install NDI Tools to enable output' }
+    : !live
+      ? { cls: 'tally tally--start', text: 'START NDI', title: 'Publish this page as an NDI source' }
+      : armed
+        ? { cls: 'tally tally--arm', text: 'CLICK AGAIN TO STOP', title: 'Confirm — takes the source off air' }
+        : {
+            cls: 'tally tally--live',
+            text: state.receivers > 0 ? '● ON AIR · SEEN' : '● ON AIR',
+            title: 'Live — click to stop (guarded)'
+          }
+
   return (
     <header className="topbar">
       <div className="topbar__brand">
@@ -33,12 +56,20 @@ export function TopBar({ state }: { state: PaneState }): React.JSX.Element {
         </span>
         <span className="topbar__tag">webpage → NDI</span>
       </div>
-      <div className="topbar__status">
+      <div className="topbar__console">
         <span className="ndi-chip" title={cleanVersion(state.ndiVersion)}>
           <span className="ndi-chip__label">NDI</span>
           <span className="ndi-chip__name">{state.config.ndiName}</span>
         </span>
-        <span className={p.cls}>{p.text}</span>
+        <button
+          className={control.cls}
+          title={control.title}
+          disabled={noRuntime}
+          onClick={onControl}
+          onMouseLeave={disarm}
+        >
+          {control.text}
+        </button>
       </div>
     </header>
   )
