@@ -15,6 +15,10 @@ export interface PaneApi {
   setSettings: (patch: SettingsPatch) => Promise<IpcResult>
   getState: () => Promise<IpcResult<PaneState>>
   sendInput: (ev: InputEventReq) => void
+  updateDownload: () => Promise<IpcResult>
+  updateLater: () => Promise<IpcResult>
+  updateSkip: () => Promise<IpcResult>
+  updateRestart: () => Promise<IpcResult>
   onState: (cb: (state: PaneState) => void) => () => void
   onPreview: (cb: (data: Uint8Array, mime: string) => void) => () => void
   onCursor: (cb: (cursor: string) => void) => () => void

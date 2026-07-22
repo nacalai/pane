@@ -5,6 +5,7 @@ import { UrlBar } from './components/UrlBar'
 import { Preview } from './components/Preview'
 import { SettingsRail } from './components/SettingsRail'
 import { StatsStrip } from './components/StatsStrip'
+import { UpdateBanner } from './components/UpdateBanner'
 
 export default function App(): React.JSX.Element {
   const [state, setState] = useState<PaneState | null>(null)
@@ -45,6 +46,7 @@ export default function App(): React.JSX.Element {
   return (
     <div className="app">
       <TopBar state={state} />
+      {state.update && <UpdateBanner update={state.update} />}
       <UrlBar state={state} />
       <div className="main">
         <Preview state={state} previewUrl={previewUrl} cursor={cursor} />

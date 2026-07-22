@@ -76,4 +76,21 @@ export function registerIpc(app: PaneApp): void {
     const parsed = InputEventSchema.safeParse(raw)
     if (parsed.success) app.capture.injectInput(parsed.data)
   })
+  // Update actions (no payload).
+  ipcMain.handle('pane:update-download', () => {
+    app.requestUpdateDownload()
+    return { ok: true, data: null }
+  })
+  ipcMain.handle('pane:update-later', () => {
+    app.dismissUpdate()
+    return { ok: true, data: null }
+  })
+  ipcMain.handle('pane:update-skip', () => {
+    app.skipUpdate()
+    return { ok: true, data: null }
+  })
+  ipcMain.handle('pane:update-restart', () => {
+    app.restartForUpdate()
+    return { ok: true, data: null }
+  })
 }

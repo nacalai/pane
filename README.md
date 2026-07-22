@@ -1,70 +1,98 @@
-# Pane — a webpage you can *drive*, live as an NDI source
+# Pane — Webpage to NDI
 
-Pane turns any web page into a live **[NDI](https://ndi.video/)** video source for your switcher
-(vMix, OBS/DistroAV, TriCaster…). Type a URL, and the whole rendered page is published on the
-network as `MACHINE (Pane)`.
+**Pane turns any web page into a live [NDI®](https://ndi.video/) video source you can navigate and
+interact with — a browser source for vMix, OBS Studio, TriCaster and any NDI receiver.**
 
-**The key difference from HTML‑to‑NDI tools:** Pane is a *browser you interact with*, not a
-one‑shot converter. Tools like `htmltondi` just render a static HTML file to NDI — you can't
-navigate, click, or change anything. Pane lets you (or a presenter) **navigate pages, click
-buttons, switch tabs in a chart, fill forms, and scroll** — all live on air. Bring up a stock
-graph, click through the days, jump to another page, and the NDI feed follows every interaction.
+Type a URL and the whole rendered page is published on your network as an NDI source
+(`MACHINE (Pane)`). Because Pane is a real, interactive browser — not a one‑shot converter — you can
+click, scroll, fill in forms, switch tabs in a chart and navigate to other pages, all live on air.
+Bring up a stock graph, click through the days, jump to another page, and the NDI feed follows every
+interaction.
 
-A modern replacement for the abandoned [rse/vingester](https://github.com/rse/vingester), built on
-Electron 43 (H.264/AAC included, so more of the web actually plays) and **NDI 6** via a
-zero‑compile [koffi](https://koffi.dev/) FFI binding.
+Great for **live broadcast graphics, web dashboards, data visualizations, lower thirds, scoreboards,
+and financial or sports tickers** fed straight into your video switcher over NDI.
+
+Pane is inspired by earlier web‑to‑NDI tools such as
+[vingester](https://github.com/rse/vingester) and HTML‑to‑NDI, and adds live, interactive
+navigation on top — built on Electron and **NDI 6**.
 
 ## Download
 
-Grab the latest Windows installer from the **[Releases](https://github.com/nacalai/pane/releases/latest)**
-page. Pane auto‑updates itself from there (downloads in the background, installs when you quit).
+**➡️ [Download the latest Windows installer](https://github.com/nacalai/pane/releases/latest)**
 
-## Two ways to run
+Run the installer and you're done — Pane keeps itself up to date (it asks before installing an
+update, and never mid‑broadcast). You'll also need the free
+[NDI Tools / Runtime](https://ndi.video/tools/) installed; Pane finds it automatically.
 
-| | **Studio** | **Presenter** |
-|---|---|---|
-| Window | Hidden, rendered offscreen at exact resolution | A visible window on any monitor (windowed or fullscreen) |
-| Who drives it | You, from the preview in the control app | The presenter, **directly** — real clicks, charts, forms |
-| Use for | Graphics/lower‑thirds you operate | A host walking through a live web page on air |
+> Windows 10/11 (x64). The installer isn't code‑signed yet, so Windows SmartScreen may warn on first
+> run — click **More info → Run anyway**.
 
-Both publish the identical image over the same NDI pipeline.
+## Features
 
-## Highlights
+- **Interactive** — navigate, click, type and scroll a live page; it's a browser, not a snapshot.
+- **Studio or presenter** — operate the page yourself from a hidden render, or hand a visible window
+  to a presenter to drive directly (see below).
+- **Full‑bandwidth NDI (SpeedHQ)** — near‑lossless, low latency, with alpha so transparent pages key
+  cleanly over your program.
+- **Stream Deck / Companion control** — a built‑in HTTP API to change page, click, scroll, open the
+  presenter view and more.
+- **In‑output pointer** — optionally show a colored dot or an arrow that follows the mouse (handy for
+  pointing at charts); turn it off and the presenter uses the real mouse with zero latency.
+- **Tray app** — runs in the system tray so the feed stays live; single instance; optional
+  start‑with‑Windows; a guarded STOP so a stray click can't drop the source.
+- **Broadcast helpers** — resolution and frame‑rate presets, a built‑in test card, and an optional
+  dither to reduce gradient banding.
 
-- **Interactive** — navigate, click, type, scroll; the page is live, not a snapshot.
-- **Full‑bandwidth NDI (SpeedHQ)** — near‑lossless, low latency, video + alpha (transparent pages
-  key straight over program).
-- **Per‑monitor presenter view** — open the page fullscreen on the confidence monitor.
-- **Stream Deck / Companion control** — a built‑in HTTP API (`/api/go`, `/api/key`, `/api/scroll`,
-  `/api/presenter/open`, `/api/nav/*`, `/api/status`, …).
-- **In‑output cursor** — optionally draw a colored dot or an arrow that follows the mouse (great for
-  pointing at charts); off means the presenter uses the real mouse with zero latency.
-- **Runs from the tray** — single instance, the X button minimizes to the tray so the feed stays
-  live; optional launch‑with‑Windows; guarded STOP so a stray click can't drop the source.
-- **Quality tools** — resolution/FPS presets, a broadcast test card, and an optional dither to tame
-  gradient banding.
+## Studio vs. presenter
 
-## Requirements
+Pane can render the page two ways — pick per use:
 
-- Windows 10/11 (x64)
-- [NDI Tools / Runtime](https://ndi.video/tools/) installed (Pane finds it automatically; without
-  it the app still runs, with a clear notice and full preview/navigation).
+- **Studio** *(default)* — the page renders hidden at your exact output resolution and you drive it
+  from the preview in the Pane window. Best for graphics you operate yourself.
+- **Presenter** — the page opens in a real, visible window (windowed or fullscreen, on any monitor)
+  that a host controls directly with their mouse and keyboard. Best for a presenter walking through
+  a live page on air.
 
-## Develop
+Either way, the NDI output is exactly the page you see.
+
+## Remote control (Stream Deck / Companion)
+
+Pane exposes a small local HTTP API, e.g.:
+
+```
+GET /api/go?url=example.com          load a page
+GET /api/nav/back | forward | reload navigation
+GET /api/key?key=ArrowRight          send a keypress (next slide, etc.)
+GET /api/scroll?dy=600               scroll
+GET /api/presenter/open?fullscreen=1 open the presenter window
+GET /api/status                      current state (JSON)
+```
+
+Loopback works with no setup; LAN access is opt‑in and token‑protected.
+
+---
+
+## Building from source (for developers)
+
+Most people should just use the **[Releases](https://github.com/nacalai/pane/releases/latest)** above.
+To build or contribute:
 
 ```bash
 npm install
 npm run dev        # run in development
-npm start          # run the built app (build first: npm run build)
 npm run dist       # build the Windows installer (NSIS) → release/
 npm run typecheck && npm run lint && npm test
 ```
 
-Autonomous smoke test + an independent NDI receiver probe:
+Tech: Electron + TypeScript + React, with a zero‑compile [koffi](https://koffi.dev/) FFI binding to
+the NDI 6 runtime. An autonomous smoke test and an independent NDI‑receiver probe are included:
 
 ```bash
-PANE_SELFCHECK=1 npm start          # 20 s smoke → selfcheck.json + screenshot
-node tools/ndi-probe.cjs Pane 10    # receive the source, report resolution/fps/pixels
+PANE_SELFCHECK=1 npm start          # 20 s smoke test → selfcheck.json + screenshot
+node tools/ndi-probe.cjs Pane 10    # receive the source; report resolution/fps/pixels
 ```
 
-Design and implementation notes live in `docs/`.
+---
+
+*NDI® is a registered trademark of Vizrt NDI AB. Pane is an independent project and is not affiliated
+with or endorsed by Vizrt, vMix, OBS, or the other tools mentioned.*

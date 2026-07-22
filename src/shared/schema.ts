@@ -49,6 +49,7 @@ export interface PaneConfig {
   httpToken: string
   launchAtLogin: boolean
   startMinimized: boolean
+  skipUpdateVersion: string
 }
 
 export const DEFAULT_HTTP_PORT = 9350
@@ -75,7 +76,8 @@ export const DEFAULT_CONFIG: PaneConfig = {
   httpLan: false,
   httpToken: '',
   launchAtLogin: false,
-  startMinimized: false
+  startMinimized: false,
+  skipUpdateVersion: ''
 }
 
 const fpsSchema = z.union([z.literal(25), z.literal(30), z.literal(50), z.literal(60)])
@@ -105,7 +107,8 @@ export const SettingsPatchSchema = z
     httpLan: z.boolean(),
     httpToken: z.string().max(128),
     launchAtLogin: z.boolean(),
-    startMinimized: z.boolean()
+    startMinimized: z.boolean(),
+    skipUpdateVersion: z.string().max(32)
   })
   .partial()
 export type SettingsPatch = z.infer<typeof SettingsPatchSchema>
@@ -171,6 +174,16 @@ export type InputEventReq = z.infer<typeof InputEventSchema>
 
 export type NdiStatus = 'off' | 'live' | 'no-runtime' | 'error'
 
+/** An update the user has been asked about (never auto-downloaded). */
+export interface UpdateInfo {
+  version: string
+  notes: string
+  /** true once the chosen update has finished downloading and is ready to install. */
+  downloaded: boolean
+  /** true while the update is downloading after the user chose to update. */
+  downloading: boolean
+}
+
 /** A connected monitor, for the presenter-window display picker. */
 export interface DisplayInfo {
   id: number
@@ -207,6 +220,7 @@ export interface PaneState {
   presenterFullscreen: boolean
   httpError: string | null
   displays: DisplayInfo[]
+  update: UpdateInfo | null
   nav: NavState
   config: PaneConfig
 }

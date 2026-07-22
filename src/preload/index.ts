@@ -23,6 +23,10 @@ const api = {
   sendInput: (ev: unknown) => {
     ipcRenderer.send('pane:input', ev)
   },
+  updateDownload: () => ipcRenderer.invoke('pane:update-download'),
+  updateLater: () => ipcRenderer.invoke('pane:update-later'),
+  updateSkip: () => ipcRenderer.invoke('pane:update-skip'),
+  updateRestart: () => ipcRenderer.invoke('pane:update-restart'),
   onState: (cb: (state: unknown) => void) => subscribe('pane:state', cb),
   onPreview: (cb: (data: Uint8Array, mime: string) => void) => subscribe('pane:preview', cb),
   onCursor: (cb: (cursor: string) => void) => subscribe('pane:cursor', cb)

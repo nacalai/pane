@@ -6,3 +6,8 @@ selfcheck.json
 selfcheck.png
 .env
 release/
+
+# Claude Code planning docs / project instructions (kept local, not shipped)
+CLAUDE.md
+docs/superpowers/
+.claude/

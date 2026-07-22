@@ -16,7 +16,8 @@ import {
   type NdiStatus,
   type SettingsPatch,
   type PaneConfig,
-  type PaneState
+  type PaneState,
+  type UpdateInfo
 } from '@shared/schema'
 
 export class PaneApp {
@@ -32,8 +33,52 @@ export class PaneApp {
   private psbId: number | null = null
   private downThis = false
   private displays: DisplayInfo[] = []
+  private update: UpdateInfo | null = null
+  private updateActions: { download: () => void; restart: () => void } | null = null
 
   readonly http = new ControlServer((cmd) => this.execCommand(cmd))
+
+  /** index.ts wires the actual electron-updater download/quitAndInstall calls here. */
+  onUpdateActions(actions: { download: () => void; restart: () => void }): void {
+    this.updateActions = actions
+  }
+
+  /** An update is available (never auto-downloaded). Skip if the user chose to skip this version. */
+  presentUpdate(version: string, notes: string): void {
+    if (version === this.config.skipUpdateVersion) return
+    this.update = { version, notes, downloaded: false, downloading: false }
+    this.pushState()
+  }
+
+  markUpdateDownloaded(): void {
+    if (this.update) this.update = { ...this.update, downloaded: true, downloading: false }
+    this.pushState()
+  }
+
+  /** User chose to update → start the download. */
+  requestUpdateDownload(): void {
+    if (!this.update) return
+    this.update = { ...this.update, downloading: true }
+    this.pushState()
+    this.updateActions?.download()
+  }
+
+  /** "Remind me later" — dismiss for now; it re-appears on the next check. */
+  dismissUpdate(): void {
+    this.update = null
+    this.pushState()
+  }
+
+  /** "Don't remind me for this version". */
+  skipUpdate(): void {
+    if (this.update) this.applySettings({ skipUpdateVersion: this.update.version })
+    this.update = null
+    this.pushState()
+  }
+
+  restartForUpdate(): void {
+    this.updateActions?.restart()
+  }
 
   /** index.ts feeds the connected-monitor list here (and on hotplug). */
   setDisplays(displays: DisplayInfo[]): void {
@@ -252,6 +297,7 @@ export class PaneApp {
       presenterFullscreen: this.capture.isPresenterFullscreen(),
       httpError: this.http.error,
       displays: this.displays,
+      update: this.update,
       nav: this.capture.currentNav(),
       config: { ...this.config }
     }

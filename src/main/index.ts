@@ -32,30 +32,59 @@ let isQuitting = false
 let updateReadyVersion: string | null = null
 
 /**
- * Auto-update from GitHub Releases (public repo, no token needed). Downloads in the background
- * and installs on quit — NEVER mid-broadcast. The tray offers an explicit "Restart to update"
- * once a build is downloaded. Packaged builds only; never during selfcheck/dev.
+ * Update from GitHub Releases (public repo, no token needed). NEVER auto-downloads: on finding a
+ * newer release it asks the user (in-app banner + changelog) to update now, be reminded later, or
+ * skip the version. Only after they choose "update" does it download; it installs on quit or on an
+ * explicit restart — never mid-broadcast. Packaged builds only; never during selfcheck/dev.
  */
 function setupAutoUpdate(): void {
-  if (!app.isPackaged || SELFCHECK) return
-  autoUpdater.autoDownload = true
+  if (!app.isPackaged || SELFCHECK || !pane) return
+  autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = true
+  autoUpdater.fullChangelog = false
+  pane.onUpdateActions({
+    download: () => {
+      void autoUpdater.downloadUpdate().catch((e: Error) => console.error('[update] download:', e.message))
+    },
+    restart: () => {
+      isQuitting = true
+      autoUpdater.quitAndInstall()
+    }
+  })
   autoUpdater.on('error', (e: Error) => console.error('[update] error:', e.message))
-  autoUpdater.on('update-available', (i: { version: string }) =>
+  autoUpdater.on('update-available', (i) => {
     console.log('[update] available:', i.version)
-  )
+    pane?.presentUpdate(i.version, notesToText(i.releaseNotes))
+  })
   autoUpdater.on('update-not-available', () => console.log('[update] up to date'))
   autoUpdater.on('update-downloaded', (i: { version: string }) => {
     updateReadyVersion = i.version
-    console.log(`[update] ${i.version} downloaded — installs on quit`)
+    console.log(`[update] ${i.version} downloaded — installs on restart or quit`)
     tray?.setToolTip(`Pane — update ${i.version} ready (restart to apply)`)
     rebuildTrayMenu?.()
+    pane?.markUpdateDownloaded()
   })
   const check = (): void => {
     autoUpdater.checkForUpdates().catch((e: Error) => console.error('[update] check:', e.message))
   }
   check()
   setInterval(check, 6 * 60 * 60 * 1000) // every 6 hours
+}
+
+/** GitHub release notes come as HTML or an array; flatten to plain text for the banner. */
+function notesToText(notes: string | Array<{ note?: string | null }> | null | undefined): string {
+  if (!notes) return ''
+  const html = Array.isArray(notes) ? notes.map((n) => n.note ?? '').join('\n') : notes
+  return html
+    .replace(/<\/(p|div|li|h\d)>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '• ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .slice(0, 4000)
 }
 
 /** Set by createTray so the update handler can refresh the menu when a build lands. */
@@ -240,6 +269,9 @@ if (!app.requestSingleInstanceLock()) {
     if (process.env.PANE_SELFCHECK_MODE === 'presenter') {
       const r = pane.applySettings({ mode: 'presenter' })
       if (!r.ok) console.error('[main] selfcheck mode:', r.error)
+    }
+    if (process.env.PANE_FAKE_UPDATE === '1') {
+      pane.presentUpdate('9.9.9', '• New: something great\n• Fix: an annoying bug\n• Faster startup')
     }
     if (pane.state().ndi !== 'no-runtime' && (pane.state().config.autoStart || SELFCHECK)) {
       const r = pane.startNdi()

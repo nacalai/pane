@@ -63,8 +63,63 @@ body {
 
 .app {
   height: 100%;
-  display: grid;
-  grid-template-rows: auto auto 1fr auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- update banner ---------- */
+.update {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 9px 20px;
+  background: var(--nav-bg);
+  color: #fff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 13px;
+}
+.update--ready {
+  background: var(--blue-deep);
+}
+.update__text {
+  flex: 1;
+  min-width: 240px;
+}
+.update__text b {
+  font-weight: 600;
+}
+.update__link {
+  margin-left: 10px;
+  background: none;
+  border: 0;
+  color: var(--cyan-soft);
+  cursor: pointer;
+  font-size: 12px;
+  text-decoration: underline;
+}
+.update__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.update__downloading {
+  font-size: 12px;
+  color: var(--cyan-soft);
+}
+.update__notes {
+  flex-basis: 100%;
+  margin: 4px 0 2px;
+  max-height: 180px;
+  overflow: auto;
+  background: rgba(0, 0, 0, 0.28);
+  border-radius: var(--r-input);
+  padding: 10px 12px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  color: rgba(255, 255, 255, 0.82);
 }
 
 /* ---------- top chrome (slate) ---------- */
@@ -76,6 +131,12 @@ body {
   justify-content: space-between;
   padding: 0 20px;
   height: 56px;
+  flex-shrink: 0;
+}
+.update,
+.urlrow,
+.stats {
+  flex-shrink: 0;
 }
 .topbar__brand {
   display: flex;
@@ -341,6 +402,7 @@ body {
 
 /* ---------- main area ---------- */
 .main {
+  flex: 1;
   display: grid;
   grid-template-columns: 1fr 320px;
   min-height: 0;
