@@ -1,6 +1,6 @@
 {
   "name": "pane",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Pane — webpage → NDI. Render any page offscreen at broadcast resolution and publish it as a real NDI source (video + alpha), navigable through a live preview.",
   "main": "out/main/index.js",
   "type": "module",
