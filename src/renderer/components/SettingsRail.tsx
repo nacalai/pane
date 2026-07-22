@@ -240,6 +240,14 @@ export function SettingsRail({ state }: { state: PaneState }): React.JSX.Element
           />
           <span>Reduce banding in gradients (dither)</span>
         </label>
+        <label className="check" title="Draw a pointer into the NDI output that follows the mouse (useful for a presenter pointing at charts)">
+          <input
+            type="checkbox"
+            checked={config.showCursor}
+            onChange={(e) => apply({ showCursor: e.target.checked })}
+          />
+          <span>Show mouse cursor in output</span>
+        </label>
         <label className="check" title="Turn off the in-app preview to save some CPU (does not affect the NDI output)">
           <input
             type="checkbox"

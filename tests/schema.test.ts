@@ -103,6 +103,9 @@ describe('IPC schemas', () => {
     expect(parseConfig(undefined).showPreview).toBe(true)
     expect(parseConfig({ showPreview: false }).showPreview).toBe(false)
     expect(SettingsPatchSchema.safeParse({ showPreview: 'no' }).success).toBe(false)
+    expect(parseConfig(undefined).showCursor).toBe(false)
+    expect(parseConfig({ showCursor: true }).showCursor).toBe(true)
+    expect(SettingsPatchSchema.safeParse({ showCursor: 1 }).success).toBe(false)
   })
 
   it('validates the presenter display id', () => {

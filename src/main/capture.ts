@@ -55,6 +55,29 @@ const DITHER_CSS =
   encodeURIComponent(DITHER_NOISE_SVG) +
   '")}'
 
+/**
+ * Optional synthetic cursor rendered INTO the page so it appears in the NDI output (the OS
+ * cursor and CSS cursor are never captured by OSR/capturePage). A pointer-events:none dot
+ * (laser-pointer style — good for a presenter pointing at charts) follows the page's mousemove,
+ * which fires for injected moves (studio) and the real mouse (presenter) alike. Injected via
+ * executeJavaScript; cleared on navigation, so re-applied on did-finish-load. Idempotent.
+ * Pure CSS (no SVG) to avoid quote-escaping issues in the injected source.
+ */
+const CURSOR_APPLY_JS =
+  '(function(){if(window.__paneCursor)return;' +
+  "var el=document.createElement('div');el.id='__pane-cursor';" +
+  "el.style.cssText='position:fixed;left:-100px;top:-100px;width:16px;height:16px;" +
+  'margin:-8px 0 0 -8px;border-radius:50%;background:rgba(255,90,71,.85);' +
+  "box-shadow:0 0 0 2px #fff,0 1px 6px rgba(0,0,0,.6);pointer-events:none;z-index:2147483647';" +
+  '(document.body||document.documentElement).appendChild(el);' +
+  "var move=function(e){el.style.left=e.clientX+'px';el.style.top=e.clientY+'px'};" +
+  "window.addEventListener('mousemove',move,true);" +
+  'window.__paneCursor=el;window.__paneCursorMove=move;})()'
+const CURSOR_REMOVE_JS =
+  '(function(){if(window.__paneCursorMove){window.removeEventListener("mousemove",window.__paneCursorMove,true)}' +
+  'var el=document.getElementById("__pane-cursor");if(el)el.remove();' +
+  'window.__paneCursor=null;window.__paneCursorMove=null;})()'
+
 export interface CaptureStats {
   sentFps: number
   framesSent: number
@@ -196,6 +219,7 @@ export class PaneCapture extends EventEmitter<CaptureEvents> {
       this.crashCount = 0
       this.ditherKey = null // insertCSS is cleared on navigation; re-apply for the new document
       this.applyDither()
+      this.applyCursor()
       this.pushNav()
     })
 
@@ -526,6 +550,10 @@ export class PaneCapture extends EventEmitter<CaptureEvents> {
       if (next.dither) this.applyDither()
       else this.removeDither()
     }
+    if (next.showCursor !== prev.showCursor) {
+      if (next.showCursor) this.applyCursor()
+      else this.removeCursor()
+    }
     if (
       next.mode === 'presenter' &&
       (next.presenterFullscreen !== prev.presenterFullscreen ||
@@ -603,6 +631,21 @@ export class PaneCapture extends EventEmitter<CaptureEvents> {
         /* page may have navigated away — the CSS is already gone */
       })
     }
+  }
+
+  /** Inject the synthetic cursor into the current document so it shows in the NDI output. */
+  private applyCursor(): void {
+    const contents = this.contents
+    if (!contents || !this.cfg.showCursor) return
+    contents
+      .executeJavaScript(CURSOR_APPLY_JS, true)
+      .catch((e: unknown) => console.error('[capture] cursor inject:', (e as Error).message))
+  }
+
+  private removeCursor(): void {
+    this.contents?.executeJavaScript(CURSOR_REMOVE_JS, true).catch(() => {
+      /* page may have navigated away — the element is already gone */
+    })
   }
 
   /** Re-place the presenter window if a monitor was added/removed/reconfigured. */

@@ -34,6 +34,7 @@ export interface PaneConfig {
   autoStart: boolean
   dither: boolean
   showPreview: boolean
+  showCursor: boolean
   mode: PaneMode
   presenterFullscreen: boolean
   presenterDisplayId: number
@@ -58,6 +59,7 @@ export const DEFAULT_CONFIG: PaneConfig = {
   autoStart: true,
   dither: false,
   showPreview: true,
+  showCursor: false,
   mode: 'studio',
   presenterFullscreen: false,
   presenterDisplayId: 0,
@@ -84,6 +86,7 @@ export const SettingsPatchSchema = z
     autoStart: z.boolean(),
     dither: z.boolean(),
     showPreview: z.boolean(),
+    showCursor: z.boolean(),
     mode: z.enum(['studio', 'presenter']),
     presenterFullscreen: z.boolean(),
     // 0 = follow primary display; otherwise an Electron display id.
